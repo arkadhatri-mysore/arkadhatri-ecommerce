@@ -8,6 +8,15 @@ import {
 } from 'lucide-react'
 
 /* ---------------------- IMAGE ASSETS ---------------------- */
+const LOGO_URL = 'https://customer-assets-jt897jd0.emergentagent.net/job_timeless-crafted-8/artifacts/xkx14q2d_ARK%20LOGO.jpeg'
+
+// Cinematic silk / weaving footage (Pexels, warm-toned, seamless loops)
+const HERO_VIDEOS = [
+  'https://videos.pexels.com/video-files/7710243/7710243-hd_1920_1080_25fps.mp4',
+  'https://videos.pexels.com/video-files/6069112/6069112-uhd_2560_1440_25fps.mp4',
+  'https://videos.pexels.com/video-files/5644067/5644067-uhd_2560_1440_25fps.mp4'
+]
+
 const IMG = {
   hero: 'https://images.unsplash.com/photo-1570212773364-e30cd076539e?auto=format&fit=crop&w=2000&q=85',
   story1: 'https://images.unsplash.com/photo-1617694820985-a5476fe22722?auto=format&fit=crop&w=1400&q=85',
@@ -88,19 +97,16 @@ const LuxuryCursor = () => {
   )
 }
 
-/* ---------------------- LOGO (AK MONOGRAM) ---------------------- */
-const Logo = ({ size = 40, mono = false }) => (
-  <div className="flex items-center gap-3 select-none">
-    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="32" cy="32" r="30.5" stroke={mono ? '#F7F3EB' : '#C8A45A'} strokeWidth="1" />
-      <circle cx="32" cy="32" r="27" stroke={mono ? '#F7F3EB' : '#C8A45A'} strokeWidth="0.4" opacity="0.6" />
-      <path d="M18 46 L28 18 L32 18 L42 46 M22 38 L38 38" stroke={mono ? '#F7F3EB' : '#C8A45A'} strokeWidth="1.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M42 46 L42 18 M42 30 L52 18 M42 30 L52 46" stroke={mono ? '#F7F3EB' : '#C8A45A'} strokeWidth="1.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-    <div className="leading-none">
-      <div className="font-cinzel text-[1.05rem] tracking-[0.35em] text-ivory">ARKADHATRI</div>
-      <div className="font-cormorant italic text-[0.65rem] tracking-[0.3em] text-gold mt-1">MAISON DE LUXE · EST. 2025</div>
-    </div>
+/* ---------------------- LOGO (Official Brand Mark) ---------------------- */
+const Logo = ({ size = 64 }) => (
+  <div className="flex items-center select-none" style={{ height: size }}>
+    <img
+      src={LOGO_URL}
+      alt="ARKADHATRI \u2014 Timeless Luxury. Modern Heritage."
+      style={{ height: size, width: 'auto', mixBlendMode: 'lighten' }}
+      className="object-contain"
+      draggable={false}
+    />
   </div>
 )
 
@@ -136,7 +142,7 @@ const Nav = () => {
           </button>
 
           <a href="#top" className="cursor-hover">
-            <Logo size={scrolled ? 34 : 42} />
+            <Logo size={scrolled ? 52 : 68} />
           </a>
 
           <div className="flex items-center gap-5 sm:gap-7">
@@ -162,7 +168,7 @@ const Nav = () => {
             className="fixed inset-0 z-[60] bg-burgundy-ink"
           >
             <motion.div initial={{ y: -30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -20, opacity: 0 }} transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }} className="container pt-8 pb-4 flex items-center justify-between border-b border-gold/20">
-              <Logo size={40} />
+              <Logo size={64} />
               <button onClick={() => setOpen(false)} className="cursor-hover text-ivory hover:text-gold transition-colors flex items-center gap-2">
                 <span className="font-cinzel text-[0.65rem] tracking-[0.35em]">CLOSE</span>
                 <X size={22} strokeWidth={1.2} />
@@ -217,60 +223,126 @@ const SectionLabel = ({ number, title }) => (
   </div>
 )
 
-/* ---------------------- HERO ---------------------- */
+/* ---------------------- HERO (Cinematic Video) ---------------------- */
 const Hero = () => {
   const ref = useRef(null)
+  const videoRef = useRef(null)
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end start'] })
-  const y = useTransform(scrollYProgress, [0, 1], ['0%', '30%'])
-  const scale = useTransform(scrollYProgress, [0, 1], [1, 1.15])
-  const opacity = useTransform(scrollYProgress, [0, 0.8], [1, 0])
+  const y = useTransform(scrollYProgress, [0, 1], ['0%', '25%'])
+  const scale = useTransform(scrollYProgress, [0, 1], [1, 1.12])
+  const opacity = useTransform(scrollYProgress, [0, 0.85], [1, 0])
+
+  const [isMobile, setIsMobile] = useState(false)
+  const [videoReady, setVideoReady] = useState(false)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)')
+    const setMob = () => setIsMobile(mq.matches)
+    setMob()
+    mq.addEventListener('change', setMob)
+    return () => mq.removeEventListener('change', setMob)
+  }, [])
+
+  useEffect(() => {
+    const v = videoRef.current
+    if (!v || isMobile) return
+    const onCanPlay = () => setVideoReady(true)
+    v.addEventListener('canplay', onCanPlay)
+    v.play().catch(() => {})
+    return () => v.removeEventListener('canplay', onCanPlay)
+  }, [isMobile])
 
   return (
     <section ref={ref} id="top" className="relative h-screen w-full overflow-hidden bg-burgundy-ink">
+      {/* Background: video on desktop, image on mobile */}
       <motion.div style={{ y, scale }} className="absolute inset-0">
-        <img src={IMG.hero} alt="Arkadhatri Bridal" className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-b from-burgundy-ink/70 via-burgundy/40 to-burgundy-ink/90" />
-        <div className="absolute inset-0 bg-burgundy/30" />
+        {/* Poster / mobile image (always present as fallback) */}
+        <img
+          src={IMG.hero}
+          alt="ARKADHATRI Atelier"
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-[1500ms] ${videoReady && !isMobile ? 'opacity-0' : 'opacity-100'}`}
+        />
+        {!isMobile && (
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="auto"
+            poster={IMG.hero}
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-[1800ms] ${videoReady ? 'opacity-100' : 'opacity-0'}`}
+            style={{ filter: 'saturate(0.9) contrast(1.05) brightness(0.85)' }}
+          >
+            {HERO_VIDEOS.map((src) => (<source key={src} src={src} type="video/mp4" />))}
+          </video>
+        )}
+        {/* Layered burgundy overlay for legibility + luxury mood */}
+        <div className="absolute inset-0 bg-gradient-to-b from-burgundy-ink/85 via-burgundy/55 to-burgundy-ink/95" />
+        <div className="absolute inset-0 bg-[#4A0F1C]/35" />
+        {/* Subtle radial vignette */}
+        <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at center, rgba(74,15,28,0) 0%, rgba(42,8,16,0.55) 75%, rgba(42,8,16,0.9) 100%)' }} />
       </motion.div>
 
       <motion.div style={{ opacity }} className="relative z-10 h-full flex flex-col items-center justify-center px-6 text-center">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1.5, delay: 0.5 }} className="divider-ornament max-w-xs mx-auto mb-8">
-          <span className="font-cinzel text-[0.65rem] tracking-[0.35em] text-gold">EST · MMXXV</span>
+        {/* Ornament + est */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1.4, delay: 0.4, ease: [0.22, 1, 0.36, 1] }} className="divider-ornament max-w-xs mx-auto mb-10">
+          <span className="font-cinzel text-[0.65rem] tracking-[0.35em] text-gold">EST &middot; MMXXV</span>
         </motion.div>
 
+        {/* AK Monogram fade-in above wordmark */}
+        <motion.img
+          src={LOGO_URL}
+          alt="ARKADHATRI Monogram"
+          initial={{ opacity: 0, scale: 0.85 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 1.8, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+          className="w-[130px] md:w-[170px] mb-4 md:mb-6"
+          style={{ filter: 'drop-shadow(0 0 24px rgba(200,164,90,0.35))' }}
+        />
+
+        {/* Wordmark in metallic gold */}
         <motion.h1
-          initial={{ opacity: 0, letterSpacing: '0.6em' }}
+          initial={{ opacity: 0, letterSpacing: '0.55em' }}
           animate={{ opacity: 1, letterSpacing: '0.2em' }}
-          transition={{ duration: 2.2, ease: [0.22, 1, 0.36, 1], delay: 0.4 }}
-          className="font-cinzel text-ivory text-[2.4rem] sm:text-6xl md:text-8xl lg:text-[9rem] tracking-[0.2em] leading-none"
+          transition={{ duration: 2.4, ease: [0.22, 1, 0.36, 1], delay: 0.5 }}
+          className="font-cinzel text-[2rem] sm:text-5xl md:text-7xl lg:text-[7.5rem] tracking-[0.2em] leading-none gold-metallic-text"
+          style={{ fontWeight: 600 }}
         >
           ARKADHATRI
         </motion.h1>
 
-        <motion.div initial={{ opacity: 0, scaleX: 0 }} animate={{ opacity: 1, scaleX: 1 }} transition={{ duration: 1.6, delay: 1.4 }} className="gold-line w-32 md:w-64 my-8" />
+        <motion.div initial={{ opacity: 0, scaleX: 0 }} animate={{ opacity: 1, scaleX: 1 }} transition={{ duration: 1.6, delay: 1.6 }} className="gold-line w-32 md:w-56 my-8 md:my-10" />
 
-        <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1.4, delay: 1.6 }} className="font-cormorant italic text-gold text-xl md:text-3xl tracking-widest">
-          Timeless Luxury. <span className="text-ivory/90">Modern Heritage.</span>
-        </motion.p>
+        {/* Tagline in warm ivory / soft grey */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1.4, delay: 1.8 }} className="space-y-1">
+          <div className="font-cinzel text-[0.85rem] md:text-[1.05rem] tracking-[0.55em] text-warm-grey">
+            TIMELESS LUXURY.
+          </div>
+          <div className="font-cinzel text-[0.85rem] md:text-[1.05rem] tracking-[0.55em] text-warm-grey">
+            MODERN HERITAGE.
+          </div>
+        </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1.4, delay: 2 }} className="mt-14 flex flex-col sm:flex-row items-center gap-5">
-          <a href="#collections" className="btn-luxury btn-luxury-filled">Explore Collection</a>
+        {/* CTAs */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1.4, delay: 2.1 }} className="mt-14 md:mt-16 flex flex-col sm:flex-row items-center gap-5">
+          <a href="#collections" className="btn-luxury-filled">Explore Collection</a>
           <a href="#contact" className="btn-luxury">Book Private Shopping</a>
         </motion.div>
 
-        {/* scroll indicator */}
+        {/* Scroll indicator */}
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1, delay: 2.6 }} className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3">
-          <span className="font-cinzel text-[0.6rem] tracking-[0.35em] text-gold/80">SCROLL</span>
-          <motion.div animate={{ y: [0, 10, 0] }} transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }} className="w-[1px] h-16 bg-gradient-to-b from-gold to-transparent" />
+          <span className="font-cinzel text-[0.6rem] tracking-[0.4em] text-gold/85">SCROLL TO DISCOVER</span>
+          <motion.div animate={{ y: [0, 12, 0] }} transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }} className="w-[1px] h-16 bg-gradient-to-b from-gold to-transparent" />
         </motion.div>
       </motion.div>
 
       {/* Vertical side text */}
       <div className="hidden lg:block absolute left-6 top-1/2 -translate-y-1/2 z-10">
-        <div className="vertical-text font-cinzel text-[0.6rem] tracking-[0.5em] text-gold/70">MAISON · MMXXV · KOLKATA</div>
+        <div className="vertical-text font-cinzel text-[0.6rem] tracking-[0.5em] text-gold/70">MAISON &middot; MMXXV &middot; KOLKATA</div>
       </div>
       <div className="hidden lg:block absolute right-6 top-1/2 -translate-y-1/2 z-10">
-        <div className="vertical-text font-cinzel text-[0.6rem] tracking-[0.5em] text-gold/70">HANDCRAFTED · IN · INDIA</div>
+        <div className="vertical-text font-cinzel text-[0.6rem] tracking-[0.5em] text-gold/70">HANDCRAFTED &middot; IN &middot; INDIA</div>
       </div>
     </section>
   )
@@ -318,26 +390,207 @@ const Story = () => {
         <motion.div initial={{ opacity: 0, x: 40 }} animate={inView ? { opacity: 1, x: 0 } : {}} transition={{ duration: 1.4, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}>
           <SectionLabel number="01" title="The House of Arkadhatri" />
           <h2 className="font-cormorant text-5xl md:text-7xl leading-[1.05] text-ivory mb-8">
-            A quiet <em className="gold-shimmer not-italic">rebellion</em>
-            <br />in silk & story.
+            Timeless heritage,<br />
+            <em className="gold-shimmer not-italic">modern luxury.</em>
           </h2>
-          <div className="space-y-5 font-inter font-light text-ivory/70 text-[15px] leading-[1.9] max-w-lg">
+          <div className="space-y-5 font-inter font-light text-ivory/75 text-[15px] leading-[1.9] max-w-lg">
             <p>
-              ARKADHATRI began with a single loom, a single thread of 24k zari, and
-              an unwavering belief — that Indian luxury deserved a house that felt as
-              considered as any European maison, yet as ancestral as the ghats of the Ganges.
+              ARKADHATRI is a luxury fashion house born from a passion for timeless
+              Indian craftsmanship and refined contemporary elegance. Every creation is
+              designed to celebrate the grace, confidence, and individuality of women
+              through exceptional quality, exquisite artistry, and enduring style.
             </p>
             <p>
-              Every drape is composed like an editorial: sketched by our design atelier in
-              Kolkata, entrusted to master weavers in Varanasi and Kancheepuram, and finished
-              in-house with hand-embellishments that can take up to fourteen months of quiet work.
+              We begin our journey with premium sarees, thoughtfully curated to honour
+              India&rsquo;s rich weaving heritage while embracing modern sophistication.
+              Looking ahead, ARKADHATRI will evolve into a complete luxury lifestyle
+              brand &mdash; offering perfumes, handbags, accessories, and carefully crafted
+              fashion essentials that embody elegance in every detail.
+            </p>
+            <p className="font-cormorant italic text-gold text-xl leading-snug pt-2">
+              Welcome to ARKADHATRI &mdash; where timeless heritage meets modern luxury.
             </p>
           </div>
           <div className="mt-10 flex items-center gap-6">
-            <a href="#craft" className="btn-luxury">Discover the Craft</a>
+            <a href="#heritage" className="btn-luxury">Discover the Heritage</a>
             <span className="font-cormorant italic text-gold text-lg">— Est. Kolkata</span>
           </div>
         </motion.div>
+      </div>
+    </section>
+  )
+}
+
+/* ---------------------- HERITAGE ---------------------- */
+const Heritage = () => {
+  const ref = useRef(null)
+  const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] })
+  const yImg = useTransform(scrollYProgress, [0, 1], ['-8%', '8%'])
+  const inView = useInView(ref, { once: true, margin: '-100px' })
+
+  return (
+    <section ref={ref} id="heritage" className="relative bg-burgundy-ink py-32 md:py-48 overflow-hidden">
+      {/* subtle gold ornament backdrop */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gold/40 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-gold/40 to-transparent" />
+
+      <div className="container">
+        {/* Editorial heading block */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={inView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 1.4, ease: [0.22, 1, 0.36, 1] }}
+          className="max-w-6xl mx-auto text-center mb-24 md:mb-32"
+        >
+          <div className="divider-ornament max-w-md mx-auto mb-8">
+            <span className="font-cinzel text-[0.65rem] tracking-[0.35em] text-gold">&mdash; 02 &middot; THE HERITAGE</span>
+          </div>
+          <h2 className="font-cormorant text-5xl md:text-7xl lg:text-[5.5rem] leading-[1.02] text-ivory">
+            Crafted with <em className="gold-shimmer not-italic">Heritage.</em>
+            <br />Designed for <em className="gold-shimmer not-italic">Generations.</em>
+          </h2>
+          <div className="gold-line w-32 mx-auto mt-10" />
+        </motion.div>
+
+        {/* Two-column editorial: image + paragraph, then paragraph + image */}
+        <div className="grid md:grid-cols-12 gap-10 md:gap-16 items-center mb-24 md:mb-32">
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            animate={inView ? { opacity: 1, x: 0 } : {}}
+            transition={{ duration: 1.4, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            className="md:col-span-6 relative aspect-[4/5] luxury-card noise-overlay overflow-hidden"
+          >
+            <motion.img style={{ y: yImg }} src={IMG.craft[0]} alt="India's textile heritage" className="w-full h-[115%] object-cover" />
+            <div className="absolute bottom-6 left-6 right-6 flex items-end justify-between">
+              <div className="font-cormorant italic text-2xl text-ivory">The Loom</div>
+              <div className="font-cinzel text-[0.6rem] tracking-[0.35em] text-gold">&mdash; VARANASI</div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 30 }}
+            animate={inView ? { opacity: 1, x: 0 } : {}}
+            transition={{ duration: 1.4, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            className="md:col-span-6 md:pl-8"
+          >
+            <div className="font-cinzel text-[0.65rem] tracking-[0.35em] text-gold mb-6">&mdash; TRIBUTE TO TRADITION</div>
+            <p className="font-cormorant text-2xl md:text-3xl text-ivory/90 leading-[1.55] font-light">
+              Every ARKADHATRI creation is a tribute to India&rsquo;s centuries-old textile
+              traditions. From selecting the finest fabrics to intricate weaving techniques
+              and refined finishing, every detail is thoughtfully perfected.
+            </p>
+            <div className="gold-line w-16 my-10" />
+            <p className="font-inter font-light text-ivory/70 text-[15px] leading-[1.95]">
+              Our artisans combine traditional craftsmanship with contemporary aesthetics
+              to create timeless masterpieces that celebrate elegance, culture, and
+              enduring beauty.
+            </p>
+          </motion.div>
+        </div>
+
+        {/* Closing editorial statement */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={inView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 1.4, delay: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          className="max-w-4xl mx-auto text-center"
+        >
+          <div className="w-1.5 h-1.5 bg-gold rotate-45 mx-auto mb-8" />
+          <p className="font-cormorant italic text-3xl md:text-5xl text-ivory leading-[1.35]">
+            Each creation is made to be <span className="text-gold">admired today</span>
+            <br className="hidden md:block" /> and <span className="text-gold">cherished for generations.</span>
+          </p>
+        </motion.div>
+      </div>
+    </section>
+  )
+}
+
+/* ---------------------- PHILOSOPHY (with Vision & Mission) ---------------------- */
+const Philosophy = () => {
+  const ref = useRef(null)
+  const inView = useInView(ref, { once: true, margin: '-100px' })
+
+  return (
+    <section ref={ref} id="philosophy" className="relative bg-burgundy-deep py-32 md:py-48 overflow-hidden">
+      {/* decorative circle glow */}
+      <div className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 w-[800px] h-[800px] rounded-full bg-gold/[0.04] blur-3xl" />
+
+      <div className="container relative">
+        {/* Philosophy manifesto */}
+        <div className="max-w-5xl mx-auto text-center mb-28 md:mb-36">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 1.2 }}>
+            <SectionLabel number="05" title="Our Philosophy" />
+            <h2 className="font-cormorant text-5xl md:text-7xl text-ivory leading-[1.05] mt-4">
+              Luxury is created through
+              <br />
+              <em className="gold-shimmer not-italic">patience, precision, and purpose.</em>
+            </h2>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={inView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 1.4, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            className="mt-14 max-w-3xl mx-auto space-y-8"
+          >
+            <p className="font-cormorant italic text-2xl md:text-3xl text-ivory/85 leading-[1.55]">
+              We believe exceptional design should never follow trends &mdash; it should
+              transcend them. Every collection is thoughtfully curated to reflect
+              timeless sophistication while preserving the authenticity of Indian
+              craftsmanship.
+            </p>
+            <div className="gold-line w-24 mx-auto" />
+            <p className="font-cinzel text-[0.85rem] md:text-[1rem] tracking-[0.35em] text-gold">
+              AT ARKADHATRI, WE CREATE EXPERIENCES &middot; NOT JUST PRODUCTS
+            </p>
+          </motion.div>
+        </div>
+
+        {/* Vision & Mission editorial split */}
+        <div className="grid md:grid-cols-2 gap-px bg-gold/15 border border-gold/15 max-w-6xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={inView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 1.2, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="bg-burgundy-deep p-10 md:p-16 group"
+          >
+            <div className="flex items-center gap-4 mb-8">
+              <span className="font-cinzel text-[0.65rem] tracking-[0.35em] text-gold">&mdash; I</span>
+              <span className="h-[1px] w-12 bg-gold" />
+              <span className="font-cinzel text-[0.65rem] tracking-[0.35em] text-gold">THE VISION</span>
+            </div>
+            <h3 className="font-cormorant text-4xl md:text-5xl text-ivory leading-[1.15] mb-8 group-hover:text-gold transition-colors duration-700">
+              A house that <em className="italic">inspires generations.</em>
+            </h3>
+            <p className="font-inter font-light text-ivory/75 text-[15px] leading-[1.95]">
+              To become one of India&rsquo;s most admired global luxury fashion houses &mdash;
+              renowned for timeless craftsmanship, uncompromising quality, and elegant
+              lifestyle creations that inspire generations.
+            </p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={inView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 1.2, delay: 0.55, ease: [0.22, 1, 0.36, 1] }}
+            className="bg-burgundy-deep p-10 md:p-16 group"
+          >
+            <div className="flex items-center gap-4 mb-8">
+              <span className="font-cinzel text-[0.65rem] tracking-[0.35em] text-gold">&mdash; II</span>
+              <span className="h-[1px] w-12 bg-gold" />
+              <span className="font-cinzel text-[0.65rem] tracking-[0.35em] text-gold">THE MISSION</span>
+            </div>
+            <h3 className="font-cormorant text-4xl md:text-5xl text-ivory leading-[1.15] mb-8 group-hover:text-gold transition-colors duration-700">
+              Heritage rendered <em className="italic">world-class.</em>
+            </h3>
+            <p className="font-inter font-light text-ivory/75 text-[15px] leading-[1.95]">
+              To create extraordinary luxury products that celebrate Indian heritage
+              while delivering world-class design, craftsmanship, and unforgettable
+              customer experiences.
+            </p>
+          </motion.div>
+        </div>
       </div>
     </section>
   )
@@ -430,15 +683,18 @@ const BestSellers = () => {
                   <span className="px-3 py-1 bg-burgundy-ink/80 backdrop-blur-sm border border-gold/30 font-cinzel text-[0.55rem] tracking-[0.35em] text-gold">HANDWOVEN</span>
                 </div>
                 <div className="absolute top-4 right-4 flex flex-col gap-2 opacity-0 group-hover:opacity-100 -translate-x-3 group-hover:translate-x-0 transition-all duration-700">
-                  <button className="w-10 h-10 bg-burgundy-ink/80 backdrop-blur-sm border border-gold/40 flex items-center justify-center hover:bg-gold hover:border-gold group/i transition-all">
+                  <button className="w-10 h-10 bg-burgundy-ink/85 backdrop-blur-sm border border-gold/40 flex items-center justify-center hover:bg-gold hover:border-gold group/i transition-all rounded-sm" aria-label="Add to Wishlist">
                     <Heart size={14} strokeWidth={1.2} className="text-gold group-hover/i:text-burgundy" />
                   </button>
-                  <button className="w-10 h-10 bg-burgundy-ink/80 backdrop-blur-sm border border-gold/40 flex items-center justify-center hover:bg-gold hover:border-gold group/i transition-all">
+                  <button className="w-10 h-10 bg-burgundy-ink/85 backdrop-blur-sm border border-gold/40 flex items-center justify-center hover:bg-gold hover:border-gold group/i transition-all rounded-sm" aria-label="Quick View">
                     <Search size={14} strokeWidth={1.2} className="text-gold group-hover/i:text-burgundy" />
+                  </button>
+                  <button className="w-10 h-10 bg-burgundy-ink/85 backdrop-blur-sm border border-gold/40 flex items-center justify-center hover:bg-gold hover:border-gold group/i transition-all rounded-sm" aria-label="Add to Bag">
+                    <ShoppingBag size={14} strokeWidth={1.2} className="text-gold group-hover/i:text-burgundy" />
                   </button>
                 </div>
                 <div className="absolute bottom-0 left-0 right-0 p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-700">
-                  <button className="w-full py-3 bg-gold text-burgundy font-cinzel text-[0.65rem] tracking-[0.35em] hover:bg-ivory transition-colors">QUICK VIEW</button>
+                  <button className="btn-product w-full">View Product</button>
                 </div>
               </div>
               <div className="pt-5 flex items-start justify-between gap-4">
@@ -643,16 +899,16 @@ const Newsletter = () => {
         <p className="mt-6 font-cormorant italic text-ivory/60 text-xl max-w-xl mx-auto">
           A private correspondence — first access to numbered pieces, atelier openings, and a rare invitation into the world of the maison.
         </p>
-        <form onSubmit={submit} className="mt-12 flex flex-col sm:flex-row items-stretch gap-0 max-w-xl mx-auto border border-gold">
+        <form onSubmit={submit} className="mt-12 flex flex-col sm:flex-row items-stretch gap-3 max-w-xl mx-auto">
           <input
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             type="email"
             required
             placeholder="Your correspondence address"
-            className="flex-1 bg-transparent px-6 py-5 outline-none text-ivory font-cormorant italic text-lg placeholder:text-ivory/40"
+            className="flex-1 bg-transparent border-2 border-gold/60 focus:border-gold px-6 py-4 outline-none text-ivory font-cormorant italic text-lg placeholder:text-ivory/40 rounded-md transition-colors"
           />
-          <button type="submit" className="btn-luxury btn-luxury-filled !border-none">{sent ? 'Welcome' : 'Subscribe'}</button>
+          <button type="submit" className="btn-luxury-filled">{sent ? 'Welcome' : 'Subscribe'}</button>
         </form>
         {sent && <p className="mt-6 font-cormorant italic text-gold">— Thank you. Your invitation shall arrive shortly.</p>}
       </div>
@@ -666,7 +922,7 @@ const Footer = () => (
     <div className="container">
       <div className="grid md:grid-cols-12 gap-12 pb-16 border-b border-gold/15">
         <div className="md:col-span-4">
-          <Logo size={44} />
+          <Logo size={110} />
           <p className="mt-8 font-cormorant italic text-ivory/60 text-lg max-w-sm leading-relaxed">
             The house of ARKADHATRI is a quiet celebration of Indian couture — timeless, considered, and hand-signed by the artisans who make it possible.
           </p>
@@ -723,7 +979,7 @@ const LoadingScreen = ({ done }) => (
         className="fixed inset-0 z-[100] bg-burgundy-ink flex flex-col items-center justify-center"
       >
         <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}>
-          <Logo size={80} />
+          <Logo size={220} />
         </motion.div>
         <div className="mt-16 w-56 h-[1px] bg-gold/20 overflow-hidden">
           <motion.div initial={{ x: '-100%' }} animate={{ x: '0%' }} transition={{ duration: 2, ease: [0.22, 1, 0.36, 1] }} className="h-full bg-gold" />
@@ -749,9 +1005,11 @@ const App = () => {
       <Hero />
       <Marquee />
       <Story />
+      <Heritage />
       <Collections />
       <BestSellers />
       <Craftsmanship />
+      <Philosophy />
       <Why />
       <Testimonials />
       <Insta />
