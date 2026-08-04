@@ -11,32 +11,39 @@ import {
 const LOGO_URL = 'https://customer-assets-jt897jd0.emergentagent.net/job_timeless-crafted-8/artifacts/xkx14q2d_ARK%20LOGO.jpeg'
 
 const IMG = {
-  hero: 'https://images.unsplash.com/photo-1727430228383-aa1fb59db8bf?auto=format&fit=crop&w=2200&q=85',
-  story: 'https://images.unsplash.com/photo-1669556273167-8d4679c4f082?auto=format&fit=crop&w=1600&q=85',
+  // Hero: tasteful traditional silk saree portrait, saree-forward composition
+  hero: 'https://images.unsplash.com/photo-1610047520958-b42ebcd2f6cb?auto=format&fit=crop&w=2200&q=85',
+
+  // Story: heritage weaving / loom close-up — saree as hero
+  story: 'https://images.unsplash.com/photo-1564656622440-e6206eb5ee63?auto=format&fit=crop&w=1600&q=85',
+
   collections: [
-    { title: 'Silk Sarees', tag: 'The Signature Weave', href: '#featured', img: 'https://images.unsplash.com/photo-1618901185975-d59f7091bcfe?auto=format&fit=crop&w=1200&q=85' },
-    { title: 'Wedding Sarees', tag: 'For The Bride', href: '#featured', img: 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=1200&q=85' },
-    { title: 'Festival Sarees', tag: 'Occasion Silks', href: '#featured', img: 'https://images.unsplash.com/photo-1710967074868-2041e4f44c17?auto=format&fit=crop&w=1200&q=85' },
-    { title: 'Daily Wear Sarees', tag: 'Everyday Elegance', href: '#featured', img: 'https://images.pexels.com/photos/34155081/pexels-photo-34155081.jpeg?auto=compress&cs=tinysrgb&w=1200' },
-    { title: 'New Arrivals', tag: 'Just In', href: '#featured', img: 'https://images.unsplash.com/photo-1710967074923-2b3ebe6171c3?auto=format&fit=crop&w=1200&q=85' }
+    { title: 'Silk Sarees',       tag: 'The Signature Weave', href: '#featured', img: 'https://images.unsplash.com/photo-1610047520958-b42ebcd2f6cb?auto=format&fit=crop&w=1200&q=85' },
+    { title: 'Wedding Sarees',    tag: 'For The Bride',       href: '#featured', img: 'https://images.unsplash.com/photo-1503160865267-af4660ce7bf2?auto=format&fit=crop&w=1200&q=85' },
+    { title: 'Festival Sarees',   tag: 'Occasion Silks',      href: '#featured', img: 'https://images.unsplash.com/photo-1654764746225-e63f5e90facd?auto=format&fit=crop&w=1200&q=85' },
+    { title: 'Daily Wear Sarees', tag: 'Everyday Elegance',   href: '#featured', img: 'https://images.unsplash.com/photo-1763400126795-d83e07d3449e?auto=format&fit=crop&w=1200&q=85' },
+    { title: 'New Arrivals',      tag: 'Just In',             href: '#featured', img: 'https://images.unsplash.com/photo-1610047614256-023d7c028d0b?auto=format&fit=crop&w=1200&q=85' }
   ],
+
   featured: [
-    { name: 'Kavya', desc: 'Kanjivaram Silk • Deep Ruby',        price: '₹ 24,500', img: 'https://images.unsplash.com/photo-1618901185975-d59f7091bcfe?auto=format&fit=crop&w=1200&q=85' },
-    { name: 'Bhavana', desc: 'Mysore Silk • Royal Purple',        price: '₹ 18,900', img: 'https://images.unsplash.com/photo-1641699862936-be9f49b1c38d?auto=format&fit=crop&w=1200&q=85' },
-    { name: 'Meenakshi', desc: 'Temple Border • Bridal Red',      price: '₹ 38,500', img: 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=1200&q=85' },
-    { name: 'Anjali',    desc: 'Festival Silk • Emerald & Gold',   price: '₹ 22,900', img: 'https://images.unsplash.com/flagged/photo-1551854716-8b811be39e7e?auto=format&fit=crop&w=1200&q=85' },
-    { name: 'Lakshmi',   desc: 'Kanjivaram Silk • Saffron',        price: '₹ 26,400', img: 'https://images.pexels.com/photos/28943474/pexels-photo-28943474.jpeg?auto=compress&cs=tinysrgb&w=1200' },
-    { name: 'Anagha',    desc: 'Mysore Silk • Rose Blush',         price: '₹ 19,500', img: 'https://images.unsplash.com/photo-1710967074868-2041e4f44c17?auto=format&fit=crop&w=1200&q=85' },
-    { name: 'Radhika',   desc: 'Pure Silk • Midnight Blue',        price: '₹ 21,900', img: 'https://images.unsplash.com/photo-1710967074923-2b3ebe6171c3?auto=format&fit=crop&w=1200&q=85' },
-    { name: 'Rukmini',   desc: 'Bridal Kanjivaram • Crimson Gold', price: '₹ 42,000', img: 'https://images.unsplash.com/photo-1654764746225-e63f5e90facd?auto=format&fit=crop&w=1200&q=85' }
+    { name: 'Kavya',    desc: 'Kanjivaram Silk • Deep Ruby',         price: '₹ 24,500', img: 'https://images.unsplash.com/photo-1610047520958-b42ebcd2f6cb?auto=format&fit=crop&w=1200&q=85' },
+    { name: 'Bhavana',  desc: 'Mysore Silk • Royal Purple',          price: '₹ 18,900', img: 'https://images.unsplash.com/photo-1503160865267-af4660ce7bf2?auto=format&fit=crop&w=1200&q=85' },
+    { name: 'Meenakshi',desc: 'Temple Border • Bridal Red',          price: '₹ 38,500', img: 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=1200&q=85' },
+    { name: 'Anjali',   desc: 'Festival Silk • Emerald & Gold',      price: '₹ 22,900', img: 'https://images.unsplash.com/photo-1610047614256-023d7c028d0b?auto=format&fit=crop&w=1200&q=85' },
+    { name: 'Lakshmi',  desc: 'Kanjivaram Silk • Bridal Gold',       price: '₹ 26,400', img: 'https://images.unsplash.com/photo-1654764746225-e63f5e90facd?auto=format&fit=crop&w=1200&q=85' },
+    { name: 'Anagha',   desc: 'Zari Border • Antique Gold',          price: '₹ 19,500', img: 'https://images.unsplash.com/photo-1763400126795-d83e07d3449e?auto=format&fit=crop&w=1200&q=85' },
+    { name: 'Radhika',  desc: 'Handwoven Silk • Traditional Weave',  price: '₹ 21,900', img: 'https://images.unsplash.com/photo-1564656622440-e6206eb5ee63?auto=format&fit=crop&w=1200&q=85' },
+    { name: 'Rukmini',  desc: 'Heritage Silk • Zari Detail',         price: '₹ 42,000', img: 'https://images.unsplash.com/photo-1779167327071-963220d85043?auto=format&fit=crop&w=1200&q=85' }
   ],
+
+  // Instagram: fabric texture, borders, pallu, weaving — saree-first
   gallery: [
-    'https://images.unsplash.com/photo-1610173827043-9db50e0d8ef9?auto=format&fit=crop&w=800&q=85',
-    'https://images.unsplash.com/photo-1600685890506-593fdf55949b?auto=format&fit=crop&w=800&q=85',
-    'https://images.unsplash.com/photo-1503160865267-af4660ce7bf2?auto=format&fit=crop&w=800&q=85',
-    'https://images.pexels.com/photos/35069916/pexels-photo-35069916.jpeg?auto=compress&cs=tinysrgb&w=800',
-    'https://images.pexels.com/photos/7956629/pexels-photo-7956629.jpeg?auto=compress&cs=tinysrgb&w=800',
-    'https://images.pexels.com/photos/32315685/pexels-photo-32315685.jpeg?auto=compress&cs=tinysrgb&w=800'
+    'https://images.unsplash.com/photo-1564656622440-e6206eb5ee63?auto=format&fit=crop&w=800&q=85',
+    'https://images.unsplash.com/photo-1763400126795-d83e07d3449e?auto=format&fit=crop&w=800&q=85',
+    'https://images.unsplash.com/photo-1779167327071-963220d85043?auto=format&fit=crop&w=800&q=85',
+    'https://images.unsplash.com/photo-1617694820985-a5476fe22722?auto=format&fit=crop&w=800&q=85',
+    'https://images.unsplash.com/photo-1598616068517-c75ad397a436?auto=format&fit=crop&w=800&q=85',
+    'https://images.unsplash.com/photo-1669556273167-8d4679c4f082?auto=format&fit=crop&w=800&q=85'
   ]
 }
 
