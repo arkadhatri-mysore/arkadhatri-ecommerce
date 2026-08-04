@@ -47,6 +47,60 @@ async function handleRoute(request, { params }) {
       return handleCORS(NextResponse.json({ message: "Hello World" }))
     }
 
+    // Orders - POST /api/orders (create order)
+    if (route === '/orders' && method === 'POST') {
+      const body = await request.json()
+      if (!body?.items?.length || !body?.customer?.email) {
+        return handleCORS(NextResponse.json({ error: 'items and customer email are required' }, { status: 400 }))
+      }
+      const order = {
+        id: uuidv4(),
+        items: body.items,
+        customer: body.customer,
+        subtotal: Number(body.subtotal) || 0,
+        shipping: Number(body.shipping) || 0,
+        total: Number(body.total) || 0,
+        currency: body.currency || 'INR',
+        paymentMethod: body.customer?.paymentMethod || 'razorpay',
+        paymentStatus: 'pending',
+        status: 'received',
+        createdAt: new Date()
+      }
+      await db.collection('orders').insertOne(order)
+      const { _id, ...safe } = order
+      return handleCORS(NextResponse.json({ ok: true, order: safe }))
+    }
+
+    // Orders - GET /api/orders/:id
+    if (route.startsWith('/orders/') && method === 'GET') {
+      const id = route.split('/')[2]
+      const order = await db.collection('orders').findOne({ id })
+      if (!order) return handleCORS(NextResponse.json({ error: 'Order not found' }, { status: 404 }))
+      const { _id, ...safe } = order
+      return handleCORS(NextResponse.json({ order: safe }))
+    }
+
+    // Newsletter - POST /api/newsletter
+    if (route === '/newsletter' && method === 'POST') {
+      const body = await request.json()
+      if (!body?.email) return handleCORS(NextResponse.json({ error: 'email required' }, { status: 400 }))
+      await db.collection('newsletter').updateOne(
+        { email: body.email.toLowerCase() },
+        { $set: { email: body.email.toLowerCase(), subscribedAt: new Date() } },
+        { upsert: true }
+      )
+      return handleCORS(NextResponse.json({ ok: true }))
+    }
+
+    // Contact - POST /api/contact
+    if (route === '/contact' && method === 'POST') {
+      const body = await request.json()
+      if (!body?.email || !body?.message) return handleCORS(NextResponse.json({ error: 'email and message required' }, { status: 400 }))
+      const msg = { id: uuidv4(), name: body.name || '', email: body.email, message: body.message, createdAt: new Date() }
+      await db.collection('contact_messages').insertOne(msg)
+      return handleCORS(NextResponse.json({ ok: true }))
+    }
+
     // Status endpoints - POST /api/status
     if (route === '/status' && method === 'POST') {
       const body = await request.json()

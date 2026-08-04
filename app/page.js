@@ -4,8 +4,11 @@ import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence, useInView } from 'framer-motion'
 import {
   Menu, X, Search, ShoppingBag, Heart, User, ChevronDown,
-  Instagram, Youtube, MapPin, Star, ArrowRight
+  Instagram, Youtube, MapPin, Star, ArrowRight, ShieldCheck, Truck, Sparkles, Award, MessageCircle
 } from 'lucide-react'
+import Link from 'next/link'
+import { cart, inr } from '@/lib/cart'
+import { PRODUCTS } from '@/lib/products'
 
 /* ---------------------- ASSETS ---------------------- */
 const LOGO_URL = 'https://customer-assets-jt897jd0.emergentagent.net/job_timeless-crafted-8/artifacts/xkx14q2d_ARK%20LOGO.jpeg'
@@ -18,22 +21,22 @@ const IMG = {
   story: 'https://images.unsplash.com/photo-1564656622440-e6206eb5ee63?auto=format&fit=crop&w=1600&q=85',
 
   collections: [
-    { title: 'Silk Sarees',       tag: 'The Signature Weave', href: '#featured', img: 'https://images.unsplash.com/photo-1610047520958-b42ebcd2f6cb?auto=format&fit=crop&w=1200&q=85' },
-    { title: 'Wedding Sarees',    tag: 'For The Bride',       href: '#featured', img: 'https://images.unsplash.com/photo-1503160865267-af4660ce7bf2?auto=format&fit=crop&w=1200&q=85' },
-    { title: 'Festival Sarees',   tag: 'Occasion Silks',      href: '#featured', img: 'https://images.unsplash.com/photo-1654764746225-e63f5e90facd?auto=format&fit=crop&w=1200&q=85' },
-    { title: 'Daily Wear Sarees', tag: 'Everyday Elegance',   href: '#featured', img: 'https://images.unsplash.com/photo-1763400126795-d83e07d3449e?auto=format&fit=crop&w=1200&q=85' },
-    { title: 'New Arrivals',      tag: 'Just In',             href: '#featured', img: 'https://images.unsplash.com/photo-1610047614256-023d7c028d0b?auto=format&fit=crop&w=1200&q=85' }
+    { title: 'Silk Sarees',       tag: 'The Signature Weave', href: '/collections/silk-sarees',       img: 'https://images.unsplash.com/photo-1610047520958-b42ebcd2f6cb?auto=format&fit=crop&w=1200&q=85' },
+    { title: 'Wedding Sarees',    tag: 'For The Bride',       href: '/collections/wedding-sarees',    img: 'https://images.unsplash.com/photo-1503160865267-af4660ce7bf2?auto=format&fit=crop&w=1200&q=85' },
+    { title: 'Festival Sarees',   tag: 'Occasion Silks',      href: '/collections/festival-sarees',   img: 'https://images.unsplash.com/photo-1654764746225-e63f5e90facd?auto=format&fit=crop&w=1200&q=85' },
+    { title: 'Daily Wear Sarees', tag: 'Everyday Elegance',   href: '/collections/everyday-elegance', img: 'https://images.unsplash.com/photo-1763400126795-d83e07d3449e?auto=format&fit=crop&w=1200&q=85' },
+    { title: 'New Arrivals',      tag: 'Just In',             href: '/collections/new-arrivals',      img: 'https://images.unsplash.com/photo-1610047614256-023d7c028d0b?auto=format&fit=crop&w=1200&q=85' }
   ],
 
   featured: [
-    { name: 'Kavya',    slug: 'kavya',    desc: 'Kanjivaram Silk • Deep Ruby',         price: '₹ 24,500', img: 'https://images.unsplash.com/photo-1610047520958-b42ebcd2f6cb?auto=format&fit=crop&w=1200&q=85' },
-    { name: 'Bhavana',  slug: 'bhavana',  desc: 'Mysore Silk • Royal Purple',          price: '₹ 18,900', img: 'https://images.unsplash.com/photo-1503160865267-af4660ce7bf2?auto=format&fit=crop&w=1200&q=85' },
-    { name: 'Meenakshi',slug: 'meenakshi',desc: 'Temple Border • Bridal Red',          price: '₹ 38,500', img: 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=1200&q=85' },
-    { name: 'Anjali',   slug: 'anjali',   desc: 'Festival Silk • Emerald & Gold',      price: '₹ 22,900', img: 'https://images.unsplash.com/photo-1610047614256-023d7c028d0b?auto=format&fit=crop&w=1200&q=85' },
-    { name: 'Lakshmi',  slug: 'lakshmi',  desc: 'Kanjivaram Silk • Bridal Gold',       price: '₹ 26,400', img: 'https://images.unsplash.com/photo-1654764746225-e63f5e90facd?auto=format&fit=crop&w=1200&q=85' },
-    { name: 'Anagha',   slug: 'anagha',   desc: 'Zari Border • Antique Gold',          price: '₹ 19,500', img: 'https://images.unsplash.com/photo-1763400126795-d83e07d3449e?auto=format&fit=crop&w=1200&q=85' },
-    { name: 'Radhika',  slug: 'radhika',  desc: 'Handwoven Silk • Traditional Weave',  price: '₹ 21,900', img: 'https://images.unsplash.com/photo-1564656622440-e6206eb5ee63?auto=format&fit=crop&w=1200&q=85' },
-    { name: 'Rukmini',  slug: 'rukmini',  desc: 'Heritage Silk • Zari Detail',         price: '₹ 42,000', img: 'https://images.unsplash.com/photo-1779167327071-963220d85043?auto=format&fit=crop&w=1200&q=85' }
+    { name: 'Kavya',    sku: 'ARK-KV-001', slug: 'kavya',    price: 24500, desc: 'Kanjivaram Silk • Deep Ruby',         img: 'https://images.unsplash.com/photo-1610047520958-b42ebcd2f6cb?auto=format&fit=crop&w=1200&q=85' },
+    { name: 'Bhavana',  sku: 'ARK-BH-002', slug: 'bhavana',  price: 18900, desc: 'Mysore Silk • Royal Purple',          img: 'https://images.unsplash.com/photo-1503160865267-af4660ce7bf2?auto=format&fit=crop&w=1200&q=85' },
+    { name: 'Meenakshi',sku: 'ARK-MK-003', slug: 'meenakshi',price: 38500, desc: 'Temple Border • Bridal Red',          img: 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=1200&q=85' },
+    { name: 'Anjali',   sku: 'ARK-AJ-004', slug: 'anjali',   price: 22900, desc: 'Festival Silk • Emerald & Gold',      img: 'https://images.unsplash.com/photo-1610047614256-023d7c028d0b?auto=format&fit=crop&w=1200&q=85' },
+    { name: 'Lakshmi',  sku: 'ARK-LK-005', slug: 'lakshmi',  price: 26400, desc: 'Kanjivaram Silk • Bridal Gold',       img: 'https://images.unsplash.com/photo-1654764746225-e63f5e90facd?auto=format&fit=crop&w=1200&q=85' },
+    { name: 'Anagha',   sku: 'ARK-AN-006', slug: 'anagha',   price: 19500, desc: 'Zari Border • Antique Gold',          img: 'https://images.unsplash.com/photo-1763400126795-d83e07d3449e?auto=format&fit=crop&w=1200&q=85' },
+    { name: 'Radhika',  sku: 'ARK-RD-007', slug: 'radhika',  price: 21900, desc: 'Handwoven Silk • Traditional Weave',  img: 'https://images.unsplash.com/photo-1564656622440-e6206eb5ee63?auto=format&fit=crop&w=1200&q=85' },
+    { name: 'Rukmini',  sku: 'ARK-RK-008', slug: 'rukmini',  price: 42000, desc: 'Heritage Silk • Zari Detail',         img: 'https://images.unsplash.com/photo-1779167327071-963220d85043?auto=format&fit=crop&w=1200&q=85' }
   ],
 
   // Instagram: fabric texture, borders, pallu, weaving — saree-first
@@ -65,17 +68,18 @@ const AnimatedBag = () => {
   const [pulse, setPulse] = useState(false)
 
   useEffect(() => {
-    const onAdd = () => {
-      setCount((c) => c + 1)
+    setCount(cart.count())
+    const sync = () => {
+      setCount(cart.count())
       setPulse(true)
       setTimeout(() => setPulse(false), 700)
     }
-    window.addEventListener('cart:add', onAdd)
-    return () => window.removeEventListener('cart:add', onAdd)
+    window.addEventListener('cart:changed', sync)
+    return () => window.removeEventListener('cart:changed', sync)
   }, [])
 
   return (
-    <button className="relative text-ivory hover:text-gold transition-colors" aria-label="Shopping bag">
+    <Link href="/cart" className="relative text-ivory hover:text-gold transition-colors" aria-label="Shopping bag">
       <motion.div animate={pulse ? { scale: [1, 1.18, 1] } : { scale: 1 }} transition={{ duration: 0.6 }}>
         <ShoppingBag size={19} strokeWidth={1.3} />
       </motion.div>
@@ -86,12 +90,12 @@ const AnimatedBag = () => {
           </motion.span>
         </AnimatePresence>
       </span>
-    </button>
+    </Link>
   )
 }
 
 /* ---------------------- ADD TO BAG ---------------------- */
-const AddToBagButton = ({ productName, size = 'md' }) => {
+const AddToBagButton = ({ product, size = 'md' }) => {
   const [added, setAdded] = useState(false)
   useEffect(() => {
     if (!added) return
@@ -102,8 +106,8 @@ const AddToBagButton = ({ productName, size = 'md' }) => {
   const click = (e) => {
     e.preventDefault(); e.stopPropagation()
     if (added) return
+    cart.add(product)
     setAdded(true)
-    window.dispatchEvent(new CustomEvent('cart:add', { detail: { name: productName } }))
   }
 
   return (
@@ -142,11 +146,11 @@ const Nav = () => {
   }, [])
 
   const collections = [
-    { name: 'Silk Sarees', href: '#collections' },
-    { name: 'Wedding Sarees', href: '#collections' },
-    { name: 'Festival Sarees', href: '#collections' },
-    { name: 'Daily Wear Sarees', href: '#collections' },
-    { name: 'New Arrivals', href: '#collections' }
+    { name: 'Silk Sarees',       href: '/collections/silk-sarees' },
+    { name: 'Wedding Sarees',    href: '/collections/wedding-sarees' },
+    { name: 'Festival Sarees',   href: '/collections/festival-sarees' },
+    { name: 'Daily Wear Sarees', href: '/collections/everyday-elegance' },
+    { name: 'New Arrivals',      href: '/collections/new-arrivals' }
   ]
 
   const links = [
@@ -352,7 +356,7 @@ const Featured = () => (
                 </button>
               </div>
               <div className="absolute bottom-3 left-3 right-3 opacity-0 translate-y-3 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-500">
-                <AddToBagButton productName={p.name} size="sm" />
+                <AddToBagButton product={{ ...p, images: [p.img], sku: p.sku, currency: '\u20b9' }} size="sm" />
               </div>
             </a>
             <div className="flex items-start justify-between gap-2">
@@ -360,7 +364,7 @@ const Featured = () => (
                 <h3 className="font-cormorant text-xl md:text-2xl text-ivory">{p.name}</h3>
                 <p className="font-inter font-light text-ivory/60 text-[12px] md:text-[13px] mt-0.5">{p.desc}</p>
               </div>
-              <div className="font-cinzel text-[0.7rem] tracking-widest text-gold whitespace-nowrap mt-1">{p.price}</div>
+              <div className="font-cinzel text-[0.7rem] tracking-widest text-gold whitespace-nowrap mt-1">₹ {inr(p.price)}</div>
             </div>
             <a href={`/product/${p.slug}`} className="mt-3 inline-flex items-center gap-1 font-cinzel text-[0.55rem] tracking-[0.35em] text-gold hover:text-ivory transition-colors">
               VIEW PRODUCT <ArrowRight size={12} strokeWidth={1.4} />
@@ -519,6 +523,14 @@ const InstaGrid = () => (
 const Newsletter = () => {
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
+  const submit = async (e) => {
+    e.preventDefault()
+    if (!email) return
+    try {
+      await fetch('/api/newsletter', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) })
+    } catch {}
+    setSent(true)
+  }
   return (
     <section className="bg-burgundy-ink py-24 md:py-28">
       <div className="container max-w-3xl text-center">
@@ -527,7 +539,7 @@ const Newsletter = () => {
         <p className="mt-4 font-cormorant italic text-warm-grey text-lg">
           Sign up for private previews and curated saree stories.
         </p>
-        <form onSubmit={(e) => { e.preventDefault(); if (email) setSent(true) }} className="mt-10 flex flex-col sm:flex-row items-stretch gap-3 max-w-xl mx-auto">
+        <form onSubmit={submit} className="mt-10 flex flex-col sm:flex-row items-stretch gap-3 max-w-xl mx-auto">
           <input
             type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
@@ -562,25 +574,26 @@ const Footer = () => (
 
         {[
           { t: 'SHOP', l: [
-            { name: 'Silk Sarees', href: '#collections' },
-            { name: 'Wedding Sarees', href: '#collections' },
-            { name: 'Festival Sarees', href: '#collections' },
-            { name: 'Daily Wear Sarees', href: '#collections' },
-            { name: 'New Arrivals', href: '#collections' }
+            { name: 'Silk Sarees',       href: '/collections/silk-sarees' },
+            { name: 'Wedding Sarees',    href: '/collections/wedding-sarees' },
+            { name: 'Festival Sarees',   href: '/collections/festival-sarees' },
+            { name: 'Everyday Elegance', href: '/collections/everyday-elegance' },
+            { name: 'New Arrivals',      href: '/collections/new-arrivals' }
           ]},
           { t: 'BOUTIQUE', l: [
-            { name: 'About', href: '#story' },
-            { name: 'Contact', href: '#contact' }
+            { name: 'About',    href: '/#story' },
+            { name: 'Contact',  href: '/contact' },
+            { name: 'FAQ',      href: '/faq' }
           ]},
           { t: 'SUPPORT', l: [
-            { name: 'Shipping', href: '#' },
-            { name: 'Returns', href: '#' },
-            { name: 'Wash Care', href: '#' },
-            { name: 'Track Order', href: '#' }
+            { name: 'Shipping Policy',    href: '/shipping-policy' },
+            { name: 'Return & Refund',    href: '/returns' },
+            { name: 'Wash Care',          href: '/faq' },
+            { name: 'Track Order',        href: '/contact' }
           ]},
           { t: 'LEGAL', l: [
-            { name: 'Privacy', href: '#' },
-            { name: 'Terms', href: '#' }
+            { name: 'Privacy Policy',     href: '/privacy-policy' },
+            { name: 'Terms & Conditions', href: '/terms' }
           ]}
         ].map((col) => (
           <div key={col.t} className="md:col-span-2">

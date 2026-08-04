@@ -2,23 +2,24 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { notFound, useParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, ChevronRight, Heart, Plus, Minus, ShoppingBag, Truck, RotateCcw, ShieldCheck, MapPin, Instagram, Youtube } from 'lucide-react'
 import { getProduct, getRelated } from '@/lib/products'
+import { cart, inr } from '@/lib/cart'
 
 const LOGO_URL = 'https://customer-assets-jt897jd0.emergentagent.net/job_timeless-crafted-8/artifacts/xkx14q2d_ARK%20LOGO.jpeg'
-
-const inr = (n) => new Intl.NumberFormat('en-IN').format(n)
 
 /* ---------------- Header (dual-theme aware) ---------------- */
 const Header = () => {
   const [count, setCount] = useState(0)
   const [pulse, setPulse] = useState(false)
   useEffect(() => {
-    const onAdd = () => { setCount((c) => c + 1); setPulse(true); setTimeout(() => setPulse(false), 600) }
-    window.addEventListener('cart:add', onAdd)
-    return () => window.removeEventListener('cart:add', onAdd)
+    setCount(cart.count())
+    const sync = () => { setCount(cart.count()); setPulse(true); setTimeout(() => setPulse(false), 600) }
+    window.addEventListener('cart:changed', sync)
+    return () => window.removeEventListener('cart:changed', sync)
   }, [])
   return (
     <header className="sticky top-0 z-40 bg-luxury-ivory/95 backdrop-blur-md border-b border-burgundy-ink/10">
@@ -30,7 +31,7 @@ const Header = () => {
         <Link href="/">
           <img src={LOGO_URL} alt="ARKADHATRI" className="h-12 md:h-14 object-contain" />
         </Link>
-        <button className="relative text-burgundy-ink hover:text-gold transition-colors" aria-label="Bag">
+        <Link href="/cart" className="relative text-burgundy-ink hover:text-gold transition-colors" aria-label="Bag">
           <motion.div animate={pulse ? { scale: [1, 1.18, 1] } : { scale: 1 }} transition={{ duration: 0.6 }}>
             <ShoppingBag size={18} strokeWidth={1.4} />
           </motion.div>
@@ -39,7 +40,7 @@ const Header = () => {
               <motion.span key={count} initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -10, opacity: 0 }} transition={{ duration: 0.3 }}>{count}</motion.span>
             </AnimatePresence>
           </span>
-        </button>
+        </Link>
       </div>
     </header>
   )
@@ -83,7 +84,8 @@ const Gallery = ({ images, name }) => {
 }
 
 /* ---------------- Add to Bag & Buy Now ---------------- */
-const AddToBag = ({ productName, variant = 'primary' }) => {
+const AddToBag = ({ product, variant = 'primary' }) => {
+  const router = useRouter()
   const [added, setAdded] = useState(false)
   useEffect(() => {
     if (!added) return
@@ -92,9 +94,15 @@ const AddToBag = ({ productName, variant = 'primary' }) => {
   }, [added])
   const click = (e) => {
     e.preventDefault()
+    if (variant === 'secondary') {
+      // Buy Now — add and go to checkout
+      cart.add(product)
+      router.push('/checkout')
+      return
+    }
     if (added) return
+    cart.add(product)
     setAdded(true)
-    window.dispatchEvent(new CustomEvent('cart:add', { detail: { name: productName } }))
   }
   const base = 'flex-1 h-14 inline-flex items-center justify-center font-cinzel text-[0.68rem] tracking-[0.28em] uppercase rounded-md transition-all duration-300'
   if (variant === 'primary') {
@@ -274,6 +282,10 @@ const ProductPage = () => {
   const product = getProduct(slug)
   const related = getRelated(slug, 4)
 
+  useEffect(() => {
+    if (product) document.title = product.seoTitle || `${product.name} — ARKADHATRI`
+  }, [product])
+
   if (!product) {
     return (
       <main className="min-h-screen bg-luxury-ivory">
@@ -287,8 +299,32 @@ const ProductPage = () => {
     )
   }
 
+  const site = process.env.NEXT_PUBLIC_BASE_URL || 'https://arkadhatri.com'
+  const productSchema = {
+    '@context': 'https://schema.org', '@type': 'Product',
+    name: product.name, sku: product.sku,
+    description: product.seoDescription || product.description,
+    image: product.images,
+    brand: { '@type': 'Brand', name: 'ARKADHATRI' },
+    offers: {
+      '@type': 'Offer', priceCurrency: 'INR', price: product.price,
+      availability: 'https://schema.org/InStock',
+      url: `${site}/product/${product.slug}`
+    }
+  }
+  const crumbs = {
+    '@context': 'https://schema.org', '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: site + '/' },
+      { '@type': 'ListItem', position: 2, name: product.collectionName, item: `${site}/collections/${product.collection}` },
+      { '@type': 'ListItem', position: 3, name: product.name }
+    ]
+  }
+
   return (
     <main className="min-h-screen bg-luxury-ivory">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(crumbs) }} />
       <Header />
 
       <div className="container py-8 md:py-14">
@@ -330,8 +366,8 @@ const ProductPage = () => {
 
             {/* Actions */}
             <div className="mt-10 flex items-stretch gap-3">
-              <AddToBag productName={product.name} variant="primary" />
-              <AddToBag productName={product.name} variant="secondary" />
+              <AddToBag product={product} variant="primary" />
+              <AddToBag product={product} variant="secondary" />
             </div>
             <button className="mt-4 flex items-center gap-2 font-cinzel text-[0.6rem] tracking-[0.35em] uppercase text-burgundy-ink/70 hover:text-gold transition-colors">
               <Heart size={14} strokeWidth={1.4} />
