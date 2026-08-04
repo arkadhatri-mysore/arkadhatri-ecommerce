@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, ChevronRight, Heart, Plus, Minus, ShoppingBag, Truck, RotateCcw, ShieldCheck, MapPin, Instagram, Youtube } from 'lucide-react'
 import { getProduct, getRelated } from '@/lib/products'
 import { cart, inr } from '@/lib/cart'
+import TrustStrip from '@/components/TrustStrip'
 
 const LOGO_URL = 'https://customer-assets-jt897jd0.emergentagent.net/job_timeless-crafted-8/artifacts/xkx14q2d_ARK%20LOGO.jpeg'
 
@@ -385,6 +386,7 @@ const ProductPage = () => {
       </div>
 
       <Related items={related} />
+      <TrustStrip variant="ivory" />
       <Footer />
     </main>
   )

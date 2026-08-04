@@ -1,12 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useParams, notFound } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, ChevronRight, ShoppingBag, Heart } from 'lucide-react'
-import { getCollection, getProductsByCollection, COLLECTIONS } from '@/lib/products'
-import { cart, inr } from '@/lib/cart'
+import { ChevronLeft, ChevronRight, ShoppingBag, SlidersHorizontal, X, ChevronDown } from 'lucide-react'
+import { getCollection, getProductsByCollection, getFilterOptions, COLLECTIONS } from '@/lib/products'
+import { cart } from '@/lib/cart'
+import ProductCard from '@/components/ProductCard'
+import TrustStrip from '@/components/TrustStrip'
 
 const LOGO_URL = 'https://customer-assets-jt897jd0.emergentagent.net/job_timeless-crafted-8/artifacts/xkx14q2d_ARK%20LOGO.jpeg'
 
@@ -35,38 +37,94 @@ const Header = () => {
   )
 }
 
-const AddToBag = ({ product }) => {
-  const [added, setAdded] = useState(false)
-  useEffect(() => { if (added) { const t = setTimeout(() => setAdded(false), 2000); return () => clearTimeout(t) } }, [added])
-  const click = (e) => { e.preventDefault(); e.stopPropagation(); if (added) return; cart.add(product); setAdded(true) }
+const SORT_OPTIONS = [
+  { key: 'featured',    label: 'Featured' },
+  { key: 'newest',      label: 'Newest' },
+  { key: 'price-asc',   label: 'Price: Low to High' },
+  { key: 'price-desc',  label: 'Price: High to Low' },
+  { key: 'bestselling', label: 'Best Selling' }
+]
+
+const Chip = ({ active, onClick, children }) => (
+  <button onClick={onClick} className={`px-3 py-1.5 rounded-full font-cinzel text-[0.55rem] tracking-[0.28em] uppercase transition-all border ${active ? 'bg-burgundy-ink text-ivory border-burgundy-ink' : 'bg-transparent text-burgundy-ink border-burgundy-ink/25 hover:border-burgundy-ink'}`}>
+    {children}
+  </button>
+)
+
+const FilterGroup = ({ title, options, active, onToggle }) => {
+  if (!options?.length) return null
   return (
-    <motion.button
-      onClick={click}
-      animate={{ backgroundColor: added ? '#4A0F1C' : '#C8A45A', color: added ? '#F7F3EB' : '#4A0F1C' }}
-      transition={{ duration: 0.3 }}
-      className="w-full h-11 font-cinzel text-[0.6rem] tracking-[0.3em] uppercase rounded-md font-semibold"
-    >
-      {added ? '\u2713 Added' : 'Add to Bag'}
-    </motion.button>
+    <div>
+      <div className="font-cinzel text-[0.55rem] tracking-[0.32em] text-burgundy-ink/80 mb-3">{title}</div>
+      <div className="flex flex-wrap gap-2">
+        {options.map((o) => (
+          <Chip key={o} active={active.includes(o)} onClick={() => onToggle(o)}>{o}</Chip>
+        ))}
+      </div>
+    </div>
   )
 }
 
-const PlaceholderBadge = () => (
-  <span className="absolute top-3 left-3 px-2 py-1 bg-burgundy-ink/80 backdrop-blur-sm border border-gold/40 rounded-sm font-cinzel text-[0.5rem] tracking-[0.25em] text-gold/95 z-10" data-placeholder="true">
-    STUDIO PHOTO PENDING
-  </span>
-)
+const PriceGroup = ({ range, setRange }) => {
+  const bands = [
+    { label: 'Under ₹ 20,000',        min: 0,     max: 20000  },
+    { label: '₹ 20,000 – ₹ 30,000',  min: 20000, max: 30000  },
+    { label: '₹ 30,000 – ₹ 45,000',  min: 30000, max: 45000  },
+    { label: 'Above ₹ 45,000',        min: 45000, max: 999999 }
+  ]
+  return (
+    <div>
+      <div className="font-cinzel text-[0.55rem] tracking-[0.32em] text-burgundy-ink/80 mb-3">PRICE</div>
+      <div className="flex flex-wrap gap-2">
+        {bands.map((b) => {
+          const active = range?.min === b.min && range?.max === b.max
+          return <Chip key={b.label} active={active} onClick={() => setRange(active ? null : b)}>{b.label}</Chip>
+        })}
+      </div>
+    </div>
+  )
+}
 
 const CollectionPage = () => {
   const { slug } = useParams()
   const collection = getCollection(slug)
-  const products = getProductsByCollection(slug)
+  const base = getProductsByCollection(slug)
 
-  useEffect(() => {
-    if (collection) {
-      document.title = `${collection.name} \u2014 ARKADHATRI`
+  useEffect(() => { if (collection) document.title = `${collection.name} \u2014 ARKADHATRI` }, [collection])
+
+  // Filter & sort state
+  const [fabrics,   setFabrics]   = useState([])
+  const [colours,   setColours]   = useState([])
+  const [occasions, setOccasions] = useState([])
+  const [availability, setAvailability] = useState([])
+  const [priceRange, setPriceRange] = useState(null)
+  const [sort, setSort] = useState('featured')
+  const [showFilters, setShowFilters] = useState(false)
+
+  const opts = useMemo(() => getFilterOptions(base), [base])
+  const toggle = (list, setList, v) => setList(list.includes(v) ? list.filter((x) => x !== v) : [...list, v])
+
+  const clearAll = () => { setFabrics([]); setColours([]); setOccasions([]); setAvailability([]); setPriceRange(null); setSort('featured') }
+  const activeFilterCount = fabrics.length + colours.length + occasions.length + availability.length + (priceRange ? 1 : 0)
+
+  const filtered = useMemo(() => {
+    let r = [...base]
+    if (fabrics.length)   r = r.filter((p) => fabrics.includes(p.fabricType))
+    if (colours.length)   r = r.filter((p) => colours.includes(p.colourFamily))
+    if (occasions.length) r = r.filter((p) => p.occasion?.some((o) => occasions.includes(o)))
+    if (availability.includes('In Stock'))      r = r.filter((p) => p.inStock)
+    if (availability.includes('New Arrivals'))  r = r.filter((p) => p.isNew)
+    if (availability.includes('Bestsellers'))   r = r.filter((p) => p.isBestseller)
+    if (priceRange) r = r.filter((p) => p.price >= priceRange.min && p.price < priceRange.max)
+    switch (sort) {
+      case 'newest':      r.sort((a, b) => Number(b.isNew) - Number(a.isNew)); break
+      case 'price-asc':   r.sort((a, b) => a.price - b.price); break
+      case 'price-desc':  r.sort((a, b) => b.price - a.price); break
+      case 'bestselling': r.sort((a, b) => Number(b.isBestseller) - Number(a.isBestseller)); break
+      default: r.sort((a, b) => (Number(b.isBestseller) + Number(b.isNew)) - (Number(a.isBestseller) + Number(a.isNew)))
     }
-  }, [collection])
+    return r
+  }, [base, fabrics, colours, occasions, availability, priceRange, sort])
 
   if (!collection) return (
     <main className="min-h-screen bg-luxury-ivory">
@@ -80,7 +138,7 @@ const CollectionPage = () => {
 
   return (
     <main className="min-h-screen bg-luxury-ivory">
-      {/* Breadcrumb Schema */}
+      {/* Breadcrumb schema */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
         '@context': 'https://schema.org', '@type': 'BreadcrumbList',
         itemListElement: [
@@ -97,7 +155,7 @@ const CollectionPage = () => {
           <img src={collection.image} alt="" className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-b from-burgundy-ink/60 to-burgundy-ink" />
         </div>
-        <div className="relative container py-24 md:py-32 text-center">
+        <div className="relative container py-20 md:py-28 text-center">
           <nav className="text-[0.6rem] tracking-[0.3em] uppercase font-cinzel text-gold/80 mb-6 flex items-center justify-center gap-2">
             <Link href="/" className="hover:text-gold transition-colors">HOME</Link>
             <ChevronRight size={11} strokeWidth={1.3} />
@@ -110,63 +168,90 @@ const CollectionPage = () => {
         </div>
       </section>
 
-      {/* Grid */}
-      <section className="py-16 md:py-24">
-        <div className="container">
-          <div className="flex items-center justify-between mb-8 md:mb-10">
-            <div className="font-cinzel text-[0.6rem] tracking-[0.3em] text-burgundy-ink/70">{products.length} PIECE{products.length === 1 ? '' : 'S'}</div>
-            <div className="font-cormorant italic text-burgundy-ink/60 text-sm">Curated by ARKADHATRI</div>
-          </div>
+      {/* Filter bar */}
+      <div className="sticky top-[68px] z-30 bg-luxury-ivory/95 backdrop-blur-md border-b border-burgundy-ink/10">
+        <div className="container flex items-center justify-between py-3 gap-4">
+          <button onClick={() => setShowFilters((v) => !v)} className="flex items-center gap-2 font-cinzel text-[0.6rem] tracking-[0.32em] uppercase text-burgundy-ink hover:text-gold transition-colors">
+            <SlidersHorizontal size={14} strokeWidth={1.4} />
+            <span>Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}</span>
+          </button>
+          <div className="font-cormorant italic text-burgundy-ink/60 text-sm hidden md:block">{filtered.length} of {base.length} pieces</div>
+          <label className="relative flex items-center gap-2">
+            <span className="hidden md:inline font-cinzel text-[0.55rem] tracking-[0.3em] uppercase text-burgundy-ink/70">SORT</span>
+            <select value={sort} onChange={(e) => setSort(e.target.value)} className="appearance-none bg-transparent border border-burgundy-ink/20 rounded-sm py-1.5 pl-3 pr-8 font-cormorant text-sm text-burgundy-ink focus:border-gold focus:outline-none">
+              {SORT_OPTIONS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+            </select>
+            <ChevronDown size={12} strokeWidth={1.4} className="absolute right-2 pointer-events-none text-burgundy-ink/60" />
+          </label>
+        </div>
 
-          {products.length === 0 ? (
-            <div className="py-24 text-center">
-              <p className="font-cormorant italic text-burgundy-ink/70 text-xl">New pieces arriving in this collection soon.</p>
-              <Link href="/" className="mt-6 btn-luxury inline-flex">Browse The Boutique</Link>
+        <AnimatePresence>
+          {showFilters && (
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3 }} className="overflow-hidden">
+              <div className="container py-6 border-t border-burgundy-ink/10 grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <FilterGroup title="FABRIC"       options={opts.fabrics}                            active={fabrics}   onToggle={(v) => toggle(fabrics,   setFabrics,   v)} />
+                <FilterGroup title="COLOUR"       options={opts.colours}                            active={colours}   onToggle={(v) => toggle(colours,   setColours,   v)} />
+                <FilterGroup title="OCCASION"     options={opts.occasions}                          active={occasions} onToggle={(v) => toggle(occasions, setOccasions, v)} />
+                <FilterGroup title="AVAILABILITY" options={['In Stock', 'New Arrivals', 'Bestsellers']} active={availability} onToggle={(v) => toggle(availability, setAvailability, v)} />
+                <PriceGroup range={priceRange} setRange={setPriceRange} />
+              </div>
+              {activeFilterCount > 0 && (
+                <div className="container pb-5 flex justify-end">
+                  <button onClick={clearAll} className="font-cinzel text-[0.55rem] tracking-[0.3em] uppercase text-burgundy-ink/70 hover:text-gold transition-colors underline underline-offset-4">Clear all filters</button>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Grid */}
+      <section className="py-14 md:py-20">
+        <div className="container">
+          {filtered.length === 0 ? (
+            <div className="py-16 md:py-24 text-center max-w-xl mx-auto">
+              <div className="eyebrow mb-4">— CURATING</div>
+              <h2 className="font-cormorant text-3xl md:text-4xl text-burgundy-ink mb-4 leading-tight">
+                We&rsquo;re curating more beautiful sarees for this collection.
+              </h2>
+              <p className="font-cormorant italic text-burgundy-ink/60 text-lg mb-8">
+                {activeFilterCount > 0 ? 'Try relaxing your filters or explore the wider curation.' : 'New pieces arrive at the atelier every few weeks.'}
+              </p>
+              <div className="flex flex-col sm:flex-row justify-center gap-3">
+                {activeFilterCount > 0 && <button onClick={clearAll} className="btn-luxury">Clear Filters</button>}
+                <Link href="/#featured" className="btn-luxury-filled">Explore All Sarees</Link>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
-              {products.map((p) => (
-                <div key={p.sku} className="group">
-                  <Link href={`/product/${p.slug}`} className="block relative aspect-[3/4] overflow-hidden rounded-sm bg-burgundy-ink/5 mb-4">
-                    <PlaceholderBadge />
-                    <img src={p.images[0]} alt={p.name} loading="lazy" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-                    {p.isNew && <span className="absolute top-3 right-3 px-2.5 py-1 bg-gold text-burgundy-ink font-cinzel text-[0.5rem] tracking-[0.3em] font-semibold rounded-sm z-10">NEW</span>}
-                    <button aria-label="Wishlist" className="absolute bottom-3 right-3 w-9 h-9 bg-luxury-ivory/90 backdrop-blur-sm border border-burgundy-ink/15 flex items-center justify-center hover:bg-gold group/w transition-colors rounded-sm opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.preventDefault()}>
-                      <Heart size={13} strokeWidth={1.4} className="text-burgundy-ink group-hover/w:text-burgundy-ink" />
-                    </button>
-                  </Link>
-                  <div className="flex items-start justify-between gap-2 mb-3">
-                    <div>
-                      <Link href={`/product/${p.slug}`} className="font-cormorant text-xl md:text-2xl text-burgundy-ink hover:text-gold transition-colors block">{p.name}</Link>
-                      <div className="font-inter font-light text-burgundy-ink/60 text-[12px] mt-0.5">{p.tagline}</div>
-                    </div>
-                    <div className="font-cinzel text-[0.68rem] tracking-widest text-burgundy-ink whitespace-nowrap mt-1" style={{ fontWeight: 600 }}>{p.currency} {inr(p.price)}</div>
-                  </div>
-                  <AddToBag product={p} />
-                </div>
-              ))}
+              {filtered.map((p) => <ProductCard key={p.sku} p={p} variant="ivory" />)}
             </div>
           )}
+        </div>
+      </section>
 
-          {/* Other collections */}
-          <div className="mt-24 pt-16 border-t border-burgundy-ink/10">
-            <div className="text-center mb-10">
-              <div className="font-cinzel text-[0.6rem] tracking-[0.3em] text-burgundy-ink/70 mb-2">— EXPLORE MORE</div>
-              <h2 className="font-cormorant text-3xl md:text-4xl text-burgundy-ink">Other Collections</h2>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {COLLECTIONS.filter((c) => c.slug !== slug).slice(0, 4).map((c) => (
-                <Link key={c.slug} href={`/collections/${c.slug}`} className="group">
-                  <div className="relative aspect-[4/5] overflow-hidden rounded-sm mb-3">
-                    <img src={c.image} alt={c.name} loading="lazy" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-                    <div className="absolute inset-0 bg-burgundy-ink/25 group-hover:bg-burgundy-ink/10 transition-colors" />
-                    <div className="absolute inset-0 flex items-end justify-center pb-5">
-                      <span className="font-cormorant text-xl md:text-2xl text-ivory">{c.name}</span>
-                    </div>
+      {/* Trust strip */}
+      <TrustStrip variant="ivory" />
+
+      {/* Other collections */}
+      <section className="py-16 md:py-20">
+        <div className="container">
+          <div className="text-center mb-10">
+            <div className="font-cinzel text-[0.6rem] tracking-[0.3em] text-burgundy-ink/70 mb-2">— EXPLORE MORE</div>
+            <h2 className="font-cormorant text-3xl md:text-4xl text-burgundy-ink">Other Collections</h2>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {COLLECTIONS.filter((c) => c.slug !== slug).slice(0, 4).map((c) => (
+              <Link key={c.slug} href={`/collections/${c.slug}`} className="group">
+                <div className="relative aspect-[4/5] overflow-hidden rounded-sm mb-3">
+                  <img src={c.image} alt={c.name} loading="lazy" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                  <div className="absolute inset-0 bg-burgundy-ink/25 group-hover:bg-burgundy-ink/10 transition-colors" />
+                  <div className="absolute inset-0 flex items-end justify-center pb-5">
+                    <span className="font-cormorant text-xl md:text-2xl text-ivory">{c.name}</span>
                   </div>
-                </Link>
-              ))}
-            </div>
+                </div>
+              </Link>
+            ))}
           </div>
         </div>
       </section>

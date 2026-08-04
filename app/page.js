@@ -9,6 +9,7 @@ import {
 import Link from 'next/link'
 import { cart, inr } from '@/lib/cart'
 import { PRODUCTS } from '@/lib/products'
+import SearchOverlay from '@/components/SearchOverlay'
 
 /* ---------------------- ASSETS ---------------------- */
 const LOGO_URL = 'https://customer-assets-jt897jd0.emergentagent.net/job_timeless-crafted-8/artifacts/xkx14q2d_ARK%20LOGO.jpeg'
@@ -138,6 +139,7 @@ const Nav = () => {
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [collectionsOpen, setCollectionsOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40)
@@ -216,7 +218,7 @@ const Nav = () => {
               ))}
             </nav>
             <div className="flex items-center gap-4 sm:gap-5">
-              <button className="text-ivory hover:text-gold transition-colors" aria-label="Search"><Search size={18} strokeWidth={1.3} /></button>
+              <button onClick={() => setSearchOpen(true)} className="text-ivory hover:text-gold transition-colors" aria-label="Search"><Search size={18} strokeWidth={1.3} /></button>
               <button className="text-ivory hover:text-gold transition-colors hidden sm:block" aria-label="Account"><User size={18} strokeWidth={1.3} /></button>
               <button className="text-ivory hover:text-gold transition-colors" aria-label="Wishlist"><Heart size={18} strokeWidth={1.3} /></button>
               <AnimatedBag />
@@ -252,6 +254,9 @@ const Nav = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Search Overlay */}
+      <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
     </>
   )
 }
