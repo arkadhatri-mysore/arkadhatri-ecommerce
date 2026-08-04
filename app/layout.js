@@ -2,12 +2,12 @@ import './globals.css'
 import { Providers } from './providers'
 
 export const metadata = {
-  title: 'ARKADHATRI — Timeless Luxury. Modern Heritage.',
-  description: 'ARKADHATRI is an ultra-premium Indian luxury fashion house crafting handwoven silk sarees, bridal couture and timeless heirlooms. Discover our world of heritage craftsmanship and modern elegance.',
-  keywords: 'ARKADHATRI, luxury sarees, Indian couture, bridal silk, handwoven, heritage, luxury fashion, sabyasachi alternative',
+  title: 'ARKADHATRI — Timeless South Indian Elegance',
+  description: 'ARKADHATRI is a premium South Indian saree boutique. Carefully curated silk sarees celebrating Karnataka, Mysore silk, and Kanjivaram temple traditions. Timeless craftsmanship, quality, and everyday elegance.',
+  keywords: 'ARKADHATRI, South Indian saree, Kanjivaram, Mysore silk, silk sarees, wedding sarees, festival sarees, daily wear sarees, Karnataka, premium sarees',
   openGraph: {
-    title: 'ARKADHATRI — Timeless Luxury. Modern Heritage.',
-    description: 'Ultra-premium Indian luxury fashion house. Handcrafted sarees and heirlooms.',
+    title: 'ARKADHATRI — Timeless South Indian Elegance',
+    description: 'A premium South Indian saree boutique. Curated silk sarees inspired by tradition.',
     type: 'website'
   }
 }
