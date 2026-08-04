@@ -26,14 +26,14 @@ const IMG = {
   ],
 
   featured: [
-    { name: 'Kavya',    desc: 'Kanjivaram Silk • Deep Ruby',         price: '₹ 24,500', img: 'https://images.unsplash.com/photo-1610047520958-b42ebcd2f6cb?auto=format&fit=crop&w=1200&q=85' },
-    { name: 'Bhavana',  desc: 'Mysore Silk • Royal Purple',          price: '₹ 18,900', img: 'https://images.unsplash.com/photo-1503160865267-af4660ce7bf2?auto=format&fit=crop&w=1200&q=85' },
-    { name: 'Meenakshi',desc: 'Temple Border • Bridal Red',          price: '₹ 38,500', img: 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=1200&q=85' },
-    { name: 'Anjali',   desc: 'Festival Silk • Emerald & Gold',      price: '₹ 22,900', img: 'https://images.unsplash.com/photo-1610047614256-023d7c028d0b?auto=format&fit=crop&w=1200&q=85' },
-    { name: 'Lakshmi',  desc: 'Kanjivaram Silk • Bridal Gold',       price: '₹ 26,400', img: 'https://images.unsplash.com/photo-1654764746225-e63f5e90facd?auto=format&fit=crop&w=1200&q=85' },
-    { name: 'Anagha',   desc: 'Zari Border • Antique Gold',          price: '₹ 19,500', img: 'https://images.unsplash.com/photo-1763400126795-d83e07d3449e?auto=format&fit=crop&w=1200&q=85' },
-    { name: 'Radhika',  desc: 'Handwoven Silk • Traditional Weave',  price: '₹ 21,900', img: 'https://images.unsplash.com/photo-1564656622440-e6206eb5ee63?auto=format&fit=crop&w=1200&q=85' },
-    { name: 'Rukmini',  desc: 'Heritage Silk • Zari Detail',         price: '₹ 42,000', img: 'https://images.unsplash.com/photo-1779167327071-963220d85043?auto=format&fit=crop&w=1200&q=85' }
+    { name: 'Kavya',    slug: 'kavya',    desc: 'Kanjivaram Silk • Deep Ruby',         price: '₹ 24,500', img: 'https://images.unsplash.com/photo-1610047520958-b42ebcd2f6cb?auto=format&fit=crop&w=1200&q=85' },
+    { name: 'Bhavana',  slug: 'bhavana',  desc: 'Mysore Silk • Royal Purple',          price: '₹ 18,900', img: 'https://images.unsplash.com/photo-1503160865267-af4660ce7bf2?auto=format&fit=crop&w=1200&q=85' },
+    { name: 'Meenakshi',slug: 'meenakshi',desc: 'Temple Border • Bridal Red',          price: '₹ 38,500', img: 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=1200&q=85' },
+    { name: 'Anjali',   slug: 'anjali',   desc: 'Festival Silk • Emerald & Gold',      price: '₹ 22,900', img: 'https://images.unsplash.com/photo-1610047614256-023d7c028d0b?auto=format&fit=crop&w=1200&q=85' },
+    { name: 'Lakshmi',  slug: 'lakshmi',  desc: 'Kanjivaram Silk • Bridal Gold',       price: '₹ 26,400', img: 'https://images.unsplash.com/photo-1654764746225-e63f5e90facd?auto=format&fit=crop&w=1200&q=85' },
+    { name: 'Anagha',   slug: 'anagha',   desc: 'Zari Border • Antique Gold',          price: '₹ 19,500', img: 'https://images.unsplash.com/photo-1763400126795-d83e07d3449e?auto=format&fit=crop&w=1200&q=85' },
+    { name: 'Radhika',  slug: 'radhika',  desc: 'Handwoven Silk • Traditional Weave',  price: '₹ 21,900', img: 'https://images.unsplash.com/photo-1564656622440-e6206eb5ee63?auto=format&fit=crop&w=1200&q=85' },
+    { name: 'Rukmini',  slug: 'rukmini',  desc: 'Heritage Silk • Zari Detail',         price: '₹ 42,000', img: 'https://images.unsplash.com/photo-1779167327071-963220d85043?auto=format&fit=crop&w=1200&q=85' }
   ],
 
   // Instagram: fabric texture, borders, pallu, weaving — saree-first
@@ -342,7 +342,7 @@ const Featured = () => (
             transition={{ duration: 0.6, delay: (i % 4) * 0.06 }}
             className="group"
           >
-            <div className="luxury-card relative aspect-[3/4] mb-4">
+            <a href={`/product/${p.slug}`} className="block luxury-card relative aspect-[3/4] mb-4">
               <img src={p.img} alt={p.name} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
               {i === 4 && <span className="absolute top-3 left-3 px-2.5 py-1 bg-burgundy-ink/85 border border-gold/40 font-cinzel text-[0.5rem] tracking-[0.3em] text-gold">NEW</span>}
               {/* hover actions */}
@@ -354,7 +354,7 @@ const Featured = () => (
               <div className="absolute bottom-3 left-3 right-3 opacity-0 translate-y-3 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-500">
                 <AddToBagButton productName={p.name} size="sm" />
               </div>
-            </div>
+            </a>
             <div className="flex items-start justify-between gap-2">
               <div>
                 <h3 className="font-cormorant text-xl md:text-2xl text-ivory">{p.name}</h3>
@@ -362,7 +362,7 @@ const Featured = () => (
               </div>
               <div className="font-cinzel text-[0.7rem] tracking-widest text-gold whitespace-nowrap mt-1">{p.price}</div>
             </div>
-            <a href="#" className="mt-3 inline-flex items-center gap-1 font-cinzel text-[0.55rem] tracking-[0.35em] text-gold hover:text-ivory transition-colors">
+            <a href={`/product/${p.slug}`} className="mt-3 inline-flex items-center gap-1 font-cinzel text-[0.55rem] tracking-[0.35em] text-gold hover:text-ivory transition-colors">
               VIEW PRODUCT <ArrowRight size={12} strokeWidth={1.4} />
             </a>
           </motion.div>
