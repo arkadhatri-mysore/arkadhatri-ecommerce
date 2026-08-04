@@ -110,6 +110,290 @@ const Logo = ({ size = 64 }) => (
   </div>
 )
 
+/* ---------------------- BAG ICON (animated on cart:add) ---------------------- */
+const AnimatedBag = () => {
+  const [count, setCount] = useState(0)
+  const [pulse, setPulse] = useState(false)
+  const [sparkleKey, setSparkleKey] = useState(0)
+
+  useEffect(() => {
+    const onAdd = () => {
+      setCount((c) => c + 1)
+      setPulse(true)
+      setSparkleKey((k) => k + 1)
+      setTimeout(() => setPulse(false), 900)
+    }
+    window.addEventListener('cart:add', onAdd)
+    return () => window.removeEventListener('cart:add', onAdd)
+  }, [])
+
+  return (
+    <button className="cursor-hover relative text-ivory hover:text-gold transition-colors duration-500" aria-label="Shopping bag">
+      <motion.div animate={pulse ? { scale: [1, 1.18, 1] } : { scale: 1 }} transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}>
+        <ShoppingBag size={18} strokeWidth={1.2} />
+      </motion.div>
+
+      {/* Sparkle */}
+      <AnimatePresence>
+        {pulse && (
+          <motion.svg
+            key={sparkleKey}
+            initial={{ opacity: 0, y: 0, scale: 0.5 }}
+            animate={{ opacity: [0, 1, 0], y: -18, scale: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.9, ease: 'easeOut' }}
+            className="absolute -top-1 -right-2 pointer-events-none"
+            width="14" height="14" viewBox="0 0 24 24" fill="none"
+          >
+            <path d="M12 2 L13.5 10.5 L22 12 L13.5 13.5 L12 22 L10.5 13.5 L2 12 L10.5 10.5 Z" fill="#C8A45A" />
+          </motion.svg>
+        )}
+      </AnimatePresence>
+
+      {/* Count with smooth number transition */}
+      <span className="absolute -top-1 -right-2 text-[9px] font-cinzel tracking-widest text-gold overflow-hidden inline-block h-3 leading-3">
+        <AnimatePresence mode="popLayout">
+          <motion.span
+            key={count}
+            initial={{ y: 12, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -12, opacity: 0 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="inline-block"
+          >
+            {count}
+          </motion.span>
+        </AnimatePresence>
+      </span>
+    </button>
+  )
+}
+
+/* ---------------------- ADD TO BAG (morphing button) ---------------------- */
+const AddToBagButton = ({ productName }) => {
+  const [added, setAdded] = useState(false)
+
+  useEffect(() => {
+    if (!added) return
+    const t = setTimeout(() => setAdded(false), 2200)
+    return () => clearTimeout(t)
+  }, [added])
+
+  const handleClick = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (added) return
+    setAdded(true)
+    window.dispatchEvent(new CustomEvent('cart:add', { detail: { name: productName } }))
+  }
+
+  return (
+    <div className="w-full">
+      <motion.button
+        onClick={handleClick}
+        animate={{
+          backgroundColor: added ? '#C8A45A' : 'rgba(0,0,0,0)',
+          color: added ? '#4A0F1C' : '#C8A45A',
+          borderColor: added ? '#C8A45A' : 'rgba(200,164,90,0.6)'
+        }}
+        transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+        className="btn-product w-full relative"
+        style={{ borderWidth: 1, borderStyle: 'solid' }}
+      >
+        <AnimatePresence mode="wait" initial={false}>
+          {added ? (
+            <motion.span
+              key="added"
+              initial={{ y: 14, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -14, opacity: 0 }}
+              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              className="flex items-center gap-2"
+            >
+              <motion.svg
+                width="14" height="14" viewBox="0 0 24 24" fill="none"
+                initial={{ pathLength: 0, opacity: 0 }}
+                animate={{ pathLength: 1, opacity: 1 }}
+                transition={{ duration: 0.5, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <motion.path
+                  d="M4 12 L10 18 L20 6"
+                  stroke="#4A0F1C" strokeWidth="2.4" fill="none" strokeLinecap="round" strokeLinejoin="round"
+                  initial={{ pathLength: 0 }}
+                  animate={{ pathLength: 1 }}
+                  transition={{ duration: 0.55, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
+                />
+              </motion.svg>
+              <span>Added to Bag</span>
+            </motion.span>
+          ) : (
+            <motion.span
+              key="add"
+              initial={{ y: 14, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -14, opacity: 0 }}
+              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            >
+              Add to Bag
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </motion.button>
+
+      {/* Subtle View Bag link */}
+      <AnimatePresence>
+        {added && (
+          <motion.a
+            href="#"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.35, delay: 0.15 }}
+            className="mt-2 block text-center font-cormorant italic text-gold text-sm tracking-wide hover:text-gold-light transition-colors cursor-hover"
+          >
+            <span className="border-b border-gold/50 pb-0.5">View Bag</span>
+          </motion.a>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+/* ---------------------- LUXURY CONCIERGE ---------------------- */
+const LuxuryConcierge = () => {
+  const [open, setOpen] = useState(false)
+  const panelRef = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onClick = (e) => {
+      if (panelRef.current && !panelRef.current.contains(e.target)) setOpen(false)
+    }
+    const onEsc = (e) => e.key === 'Escape' && setOpen(false)
+    document.addEventListener('mousedown', onClick)
+    document.addEventListener('keydown', onEsc)
+    return () => {
+      document.removeEventListener('mousedown', onClick)
+      document.removeEventListener('keydown', onEsc)
+    }
+  }, [open])
+
+  const options = [
+    { t: 'Style Consultation', d: 'A private session with an ARKADHATRI stylist', href: '/book-private-shopping', icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3 L14.09 8.26 L20 9.27 L15.5 13.14 L16.82 19.02 L12 15.77 L7.18 19.02 L8.5 13.14 L4 9.27 L9.91 8.26 Z" stroke="#C8A45A" strokeWidth="1.2" strokeLinejoin="round" fill="none" /></svg>
+    ) },
+    { t: 'WhatsApp Concierge', d: 'Message our atelier team, discreetly & directly', href: 'https://wa.me/', icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M20 4 A9 9 0 0 0 5.6 15.9 L4 20 L8.2 18.6 A9 9 0 0 0 20 4 Z M9 9 C9 9 10 8 11 9 C11.5 9.5 12 10.5 12 11 C12 12 11 12 11 13 C11 14 12.5 15.5 14 16 C14.5 16 15.5 15 16 15 C16.5 15 17.5 15.5 17.5 16 C17.5 17 16 18 15 18 C13.5 18 10.5 17 8.5 15 C6.5 13 6 10.5 6 9.5 C6 8 7 6.5 8 6.5 C8.5 6.5 9 8 9 9 Z" stroke="#C8A45A" strokeWidth="1.1" fill="none" strokeLinejoin="round" /></svg>
+    ) },
+    { t: 'Private Shopping Appointment', d: 'Reserve a bespoke boutique or virtual visit', href: '/book-private-shopping', icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" stroke="#C8A45A" strokeWidth="1.2" fill="none" /><path d="M3 9 L21 9 M8 3 L8 7 M16 3 L16 7" stroke="#C8A45A" strokeWidth="1.2" /><circle cx="12" cy="14" r="1.4" fill="#C8A45A" /></svg>
+    ) }
+  ]
+
+  return (
+    <>
+      {/* Floating trigger */}
+      <motion.button
+        onClick={() => setOpen((v) => !v)}
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.8, delay: 2.5, ease: [0.22, 1, 0.36, 1] }}
+        whileHover={{ scale: 1.06 }}
+        className="fixed bottom-6 right-6 md:bottom-8 md:right-8 z-40 cursor-hover group"
+        aria-label="Luxury Concierge"
+      >
+        <div className="relative w-14 h-14 md:w-16 md:h-16 rounded-full bg-burgundy-ink border border-gold flex items-center justify-center overflow-hidden">
+          {/* subtle gold glow */}
+          <div className="absolute inset-0 rounded-full" style={{ boxShadow: '0 0 22px 0 rgba(200,164,90,0.35) inset, 0 6px 24px -6px rgba(200,164,90,0.35)' }} />
+          <AnimatePresence mode="wait" initial={false}>
+            {open ? (
+              <motion.div key="close" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.35 }}>
+                <X size={20} strokeWidth={1.2} className="text-gold" />
+              </motion.div>
+            ) : (
+              <motion.div key="ic" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }} transition={{ duration: 0.35 }}>
+                {/* Minimalist concierge bell */}
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 3 V5 M6 20 H18 M4 20 C4 15 8 12 12 12 C16 12 20 15 20 20" stroke="#C8A45A" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                  <circle cx="12" cy="3" r="1.2" fill="#C8A45A" />
+                </svg>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+        {/* Small ambient pulse ring */}
+        {!open && (
+          <motion.div
+            aria-hidden
+            animate={{ scale: [1, 1.35], opacity: [0.35, 0] }}
+            transition={{ duration: 2.6, repeat: Infinity, ease: 'easeOut' }}
+            className="absolute inset-0 rounded-full border border-gold/50"
+          />
+        )}
+      </motion.button>
+
+      {/* Panel */}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            ref={panelRef}
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.94, y: 10 }}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            className="fixed bottom-24 right-4 md:bottom-28 md:right-8 z-40 w-[min(92vw,380px)] origin-bottom-right"
+            style={{ transformOrigin: 'bottom right' }}
+          >
+            <div className="relative bg-burgundy-ink border border-gold/40 rounded-md overflow-hidden" style={{ boxShadow: '0 30px 80px -20px rgba(0,0,0,0.6), 0 0 0 1px rgba(200,164,90,0.15)' }}>
+              {/* Header */}
+              <div className="px-6 pt-6 pb-5 border-b border-gold/15">
+                <div className="font-cinzel text-[0.6rem] tracking-[0.4em] text-gold mb-1">&mdash; THE MAISON</div>
+                <div className="font-cormorant text-2xl text-ivory leading-tight">Luxury Concierge</div>
+                <div className="font-cormorant italic text-warm-grey text-sm mt-1">A private line to our atelier</div>
+              </div>
+
+              {/* Options */}
+              <div className="p-3">
+                {options.map((o, i) => (
+                  <motion.a
+                    key={o.t}
+                    href={o.href}
+                    target={o.href.startsWith('http') ? '_blank' : undefined}
+                    rel={o.href.startsWith('http') ? 'noopener noreferrer' : undefined}
+                    initial={{ opacity: 0, x: 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.5, delay: 0.12 + i * 0.08 }}
+                    className="group flex items-center gap-4 p-4 hover:bg-burgundy transition-colors duration-500 cursor-hover"
+                  >
+                    <div className="w-10 h-10 border border-gold/40 flex items-center justify-center rounded-sm shrink-0 group-hover:bg-gold group-hover:border-gold transition-all duration-500">
+                      <div className="group-hover:hidden">{o.icon}</div>
+                      <div className="hidden group-hover:block">
+                        {/* Recolor icon on hover: quick trick via cloning */}
+                        <span style={{ filter: 'brightness(0) saturate(100%) invert(6%) sepia(58%) saturate(3700%) hue-rotate(325deg) brightness(80%) contrast(96%)' }}>{o.icon}</span>
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-cormorant text-lg text-ivory group-hover:text-gold transition-colors">{o.t}</div>
+                      <div className="font-inter text-[12px] text-warm-grey font-light leading-snug mt-0.5">{o.d}</div>
+                    </div>
+                    <ArrowUpRight size={16} strokeWidth={1.2} className="text-gold/60 group-hover:text-gold -translate-x-1 group-hover:translate-x-0 transition-all duration-500" />
+                  </motion.a>
+                ))}
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 border-t border-gold/15 flex items-center justify-between">
+                <span className="font-cinzel text-[0.55rem] tracking-[0.4em] text-gold/80">ATELIER &middot; KOLKATA</span>
+                <span className="font-cormorant italic text-warm-grey text-xs">Mon &ndash; Sat &middot; 11 to 7</span>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  )
+}
+
 /* ---------------------- NAV ---------------------- */
 const Nav = () => {
   const [open, setOpen] = useState(false)
@@ -121,7 +405,14 @@ const Nav = () => {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  const links = ['Collections', 'Bridal', 'Craftsmanship', 'Journal', 'Boutiques', 'Contact']
+  const links = [
+    { t: 'Collections', href: '#collections' },
+    { t: 'Bridal', href: '#collections' },
+    { t: 'Craftsmanship', href: '/craftsmanship' },
+    { t: 'Private Shopping', href: '/book-private-shopping' },
+    { t: 'Boutiques', href: '#contact' },
+    { t: 'Contact', href: '#contact' }
+  ]
 
   return (
     <>
@@ -149,10 +440,7 @@ const Nav = () => {
             <button className="cursor-hover text-ivory hover:text-gold transition-colors duration-500"><Search size={18} strokeWidth={1.2} /></button>
             <button className="cursor-hover text-ivory hover:text-gold transition-colors duration-500 hidden sm:block"><User size={18} strokeWidth={1.2} /></button>
             <button className="cursor-hover text-ivory hover:text-gold transition-colors duration-500"><Heart size={18} strokeWidth={1.2} /></button>
-            <button className="cursor-hover text-ivory hover:text-gold transition-colors duration-500 relative">
-              <ShoppingBag size={18} strokeWidth={1.2} />
-              <span className="absolute -top-1 -right-2 text-[9px] font-cinzel tracking-widest text-gold">0</span>
-            </button>
+            <AnimatedBag />
           </div>
         </div>
       </motion.header>
@@ -180,8 +468,8 @@ const Nav = () => {
                 <nav className="flex flex-col gap-5">
                   {links.map((l, i) => (
                     <motion.a
-                      key={l}
-                      href={`#${l.toLowerCase()}`}
+                      key={l.t}
+                      href={l.href}
                       onClick={() => setOpen(false)}
                       initial={{ y: 40, opacity: 0 }}
                       animate={{ y: 0, opacity: 1 }}
@@ -189,7 +477,7 @@ const Nav = () => {
                       className="cursor-hover group flex items-baseline gap-4 border-b border-gold/10 pb-4"
                     >
                       <span className="font-cinzel text-[0.6rem] tracking-widest text-gold/60">0{i + 1}</span>
-                      <span className="font-cormorant text-4xl md:text-6xl text-ivory group-hover:text-gold transition-colors duration-500">{l}</span>
+                      <span className="font-cormorant text-4xl md:text-6xl text-ivory group-hover:text-gold transition-colors duration-500">{l.t}</span>
                       <ArrowUpRight className="ml-auto text-gold opacity-0 group-hover:opacity-100 -translate-x-4 group-hover:translate-x-0 transition-all duration-500" size={28} strokeWidth={1} />
                     </motion.a>
                   ))}
@@ -327,7 +615,7 @@ const Hero = () => {
         {/* CTAs */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1.4, delay: 2.1 }} className="mt-14 md:mt-16 flex flex-col sm:flex-row items-center gap-5">
           <a href="#collections" className="btn-luxury-filled">Explore Collection</a>
-          <a href="#contact" className="btn-luxury">Book Private Shopping</a>
+          <a href="/book-private-shopping" className="btn-luxury">Book Private Shopping</a>
         </motion.div>
 
         {/* Scroll indicator */}
@@ -412,7 +700,7 @@ const Story = () => {
             </p>
           </div>
           <div className="mt-10 flex items-center gap-6">
-            <a href="#heritage" className="btn-luxury">Discover the Heritage</a>
+            <a href="/craftsmanship" className="btn-luxury">Discover the Heritage</a>
             <span className="font-cormorant italic text-gold text-lg">— Est. Kolkata</span>
           </div>
         </motion.div>
@@ -694,7 +982,7 @@ const BestSellers = () => {
                   </button>
                 </div>
                 <div className="absolute bottom-0 left-0 right-0 p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-700">
-                  <button className="btn-product w-full">View Product</button>
+                  <AddToBagButton productName={p.name} />
                 </div>
               </div>
               <div className="pt-5 flex items-start justify-between gap-4">
@@ -939,17 +1227,41 @@ const Footer = () => (
         </div>
 
         {[
-          { t: 'MAISON', l: ['About', 'Craftsmanship', 'The Atelier', 'Sustainability', 'Press'] },
-          { t: 'DISCOVER', l: ['Silk Sarees', 'Wedding', 'Festive', 'Signature', 'Limited Edition'] },
-          { t: 'CLIENT SERVICES', l: ['Private Appointments', 'Boutiques', 'Care Guide', 'Shipping', 'Returns'] },
-          { t: 'LEGAL', l: ['Privacy', 'Terms', 'Cookies', 'Authenticity', 'Contact'] }
+          { t: 'MAISON', l: [
+            { name: 'About', href: '/#story' },
+            { name: 'Craftsmanship', href: '/craftsmanship' },
+            { name: 'The Atelier', href: '/craftsmanship' },
+            { name: 'Philosophy', href: '/#philosophy' },
+            { name: 'Press', href: '#' }
+          ]},
+          { t: 'DISCOVER', l: [
+            { name: 'Silk Sarees', href: '/#collections' },
+            { name: 'Wedding', href: '/#collections' },
+            { name: 'Festive', href: '/#collections' },
+            { name: 'Signature', href: '/#collections' },
+            { name: 'Limited Edition', href: '/#collections' }
+          ]},
+          { t: 'CLIENT SERVICES', l: [
+            { name: 'Private Appointments', href: '/book-private-shopping' },
+            { name: 'Style Consultation', href: '/book-private-shopping' },
+            { name: 'Care Guide', href: '#' },
+            { name: 'Shipping', href: '#' },
+            { name: 'Returns', href: '#' }
+          ]},
+          { t: 'LEGAL', l: [
+            { name: 'Privacy', href: '#' },
+            { name: 'Terms', href: '#' },
+            { name: 'Cookies', href: '#' },
+            { name: 'Authenticity', href: '#' },
+            { name: 'Contact', href: '#contact' }
+          ]}
         ].map((col) => (
           <div key={col.t} className="md:col-span-2">
             <div className="font-cinzel text-[0.6rem] tracking-[0.35em] text-gold mb-6">— {col.t}</div>
             <ul className="space-y-3">
               {col.l.map(item => (
-                <li key={item}>
-                  <a href="#" className="font-cormorant text-ivory/70 hover:text-gold transition-colors text-lg cursor-hover">{item}</a>
+                <li key={item.name}>
+                  <a href={item.href} className="font-cormorant text-ivory/70 hover:text-gold transition-colors text-lg cursor-hover">{item.name}</a>
                 </li>
               ))}
             </ul>
@@ -1015,6 +1327,7 @@ const App = () => {
       <Insta />
       <Newsletter />
       <Footer />
+      <LuxuryConcierge />
     </main>
   )
 }

@@ -47,6 +47,40 @@ async function handleRoute(request, { params }) {
       return handleCORS(NextResponse.json({ message: "Hello World" }))
     }
 
+    // Private Shopping Booking - POST /api/bookings
+    if (route === '/bookings' && method === 'POST') {
+      const body = await request.json()
+
+      if (!body?.fullName || !body?.email || !body?.mobile) {
+        return handleCORS(NextResponse.json(
+          { error: 'fullName, email and mobile are required' },
+          { status: 400 }
+        ))
+      }
+
+      const booking = {
+        id: uuidv4(),
+        fullName: body.fullName,
+        mobile: body.mobile,
+        email: body.email,
+        preferences: Array.isArray(body.preferences) ? body.preferences : [],
+        shoppingMethod: body.shoppingMethod || null,
+        preferredDate: body.preferredDate || null,
+        preferredTime: body.preferredTime || null,
+        city: body.city || null,
+        occasion: body.occasion || null,
+        expectedBudget: body.expectedBudget || null,
+        preferredLanguage: body.preferredLanguage || null,
+        specialRequirements: body.specialRequirements || null,
+        status: 'pending',
+        createdAt: new Date()
+      }
+
+      await db.collection('private_shopping_bookings').insertOne(booking)
+      const { _id, ...safe } = booking
+      return handleCORS(NextResponse.json({ ok: true, booking: safe }))
+    }
+
     // Status endpoints - POST /api/status
     if (route === '/status' && method === 'POST') {
       const body = await request.json()
