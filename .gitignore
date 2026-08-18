@@ -81,3 +81,19 @@ memory/test_credentials.md
 android-sdk/node_modules/@next/swc-linux-arm64-musl/next-swc.linux-arm64-musl.node
 node_modules/@next/swc-linux-arm64-gnu/next-swc.linux-arm64-gnu.node
 node_modules/@next/swc-linux-arm64-musl/next-swc.linux-arm64-musl.node
+
+# Environment files (do NOT commit secrets)
+.env
+.env.local
+.env.production
+.env.development
+.env.*.local
+!.env.example
+
+# Emergent internals & OS
+.emergent/backups/
+.DS_Store
+Thumbs.db
+*.log
+supervisord.log
+supervisord.pid

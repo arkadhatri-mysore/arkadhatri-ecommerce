@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Search, Package, Truck, CheckCircle2 } from 'lucide-react'
 
-const LOGO_URL = 'https://customer-assets-jt897jd0.emergentagent.net/job_timeless-crafted-8/artifacts/xkx14q2d_ARK%20LOGO.jpeg'
+import { LOGO_URL } from '@/lib/brand'
 
 const STEPS = [
   { key: 'PAYMENT_PENDING',  label: 'Placed' },

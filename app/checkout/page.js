@@ -9,7 +9,7 @@ import { cart, inr } from '@/lib/cart'
 import CouponBox from '@/components/CouponBox'
 import { trackEvent } from '@/components/Analytics'
 
-const LOGO_URL = 'https://customer-assets-jt897jd0.emergentagent.net/job_timeless-crafted-8/artifacts/xkx14q2d_ARK%20LOGO.jpeg'
+import { LOGO_URL } from '@/lib/brand'
 
 const FieldLabel = ({ children }) => (
   <label className="block font-cinzel text-[0.55rem] tracking-[0.3em] uppercase text-burgundy-deep/80 mb-2">{children}</label>

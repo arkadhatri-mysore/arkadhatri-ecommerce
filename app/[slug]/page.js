@@ -6,7 +6,7 @@ import { useParams, notFound } from 'next/navigation'
 import { ChevronLeft, MapPin, Instagram, Youtube } from 'lucide-react'
 import { getLegalPage, legalSlugs } from '@/lib/legal'
 
-const LOGO_URL = 'https://customer-assets-jt897jd0.emergentagent.net/job_timeless-crafted-8/artifacts/xkx14q2d_ARK%20LOGO.jpeg'
+import { LOGO_URL } from '@/lib/brand'
 
 const LegalPage = () => {
   const { slug } = useParams()

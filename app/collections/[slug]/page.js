@@ -10,7 +10,7 @@ import { cart } from '@/lib/cart'
 import ProductCard from '@/components/ProductCard'
 import TrustStrip from '@/components/TrustStrip'
 
-const LOGO_URL = 'https://customer-assets-jt897jd0.emergentagent.net/job_timeless-crafted-8/artifacts/xkx14q2d_ARK%20LOGO.jpeg'
+import { LOGO_URL } from '@/lib/brand'
 
 const Header = () => {
   const [count, setCount] = useState(0)

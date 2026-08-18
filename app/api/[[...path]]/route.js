@@ -154,8 +154,24 @@ async function handleRoute(request, { params }) {
     }
 
     // Health
-    if ((route === '/root' || route === '/') && method === 'GET') {
-      return respond({ ok: true, service: 'arkadhatri-api', version: 'v1' }, 200, request)
+    if ((route === '/root' || route === '/' || route === '/health') && method === 'GET') {
+      // Safe health check — does NOT expose secrets, DB creds, or PII.
+      let dbOk = false
+      try { await db.command({ ping: 1 }); dbOk = true } catch {}
+      return respond({
+        ok: true,
+        service: 'arkadhatri-api',
+        version: 'v1',
+        time: new Date().toISOString(),
+        db: dbOk ? 'up' : 'down',
+        integrations: {
+          razorpay: Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET),
+          razorpayWebhook: Boolean(process.env.RAZORPAY_WEBHOOK_SECRET),
+          smtp: Boolean(process.env.SMTP_HOST),
+          ga4: Boolean(process.env.NEXT_PUBLIC_GA4_ID),
+          metaPixel: Boolean(process.env.NEXT_PUBLIC_META_PIXEL_ID)
+        }
+      }, 200, request)
     }
 
     // ================= ORDERS =================

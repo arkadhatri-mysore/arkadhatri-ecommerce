@@ -8,7 +8,7 @@ import {
   Settings, LogOut, Tag, ChevronRight
 } from 'lucide-react'
 
-const LOGO_URL = 'https://customer-assets-jt897jd0.emergentagent.net/job_timeless-crafted-8/artifacts/xkx14q2d_ARK%20LOGO.jpeg'
+import { LOGO_URL } from '@/lib/brand'
 
 const NAV = [
   { href: '/admin/dashboard',  icon: LayoutDashboard, label: 'Dashboard' },

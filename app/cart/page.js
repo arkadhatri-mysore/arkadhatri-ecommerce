@@ -7,7 +7,7 @@ import { ChevronLeft, ShoppingBag, Plus, Minus, X, ShieldCheck, Truck, RotateCcw
 import { cart, inr } from '@/lib/cart'
 import CouponBox from '@/components/CouponBox'
 
-const LOGO_URL = 'https://customer-assets-jt897jd0.emergentagent.net/job_timeless-crafted-8/artifacts/xkx14q2d_ARK%20LOGO.jpeg'
+import { LOGO_URL } from '@/lib/brand'
 
 const CartPage = () => {
   const [items, setItems] = useState([])

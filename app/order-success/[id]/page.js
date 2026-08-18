@@ -8,7 +8,7 @@ import { MapPin } from 'lucide-react'
 import { inr } from '@/lib/cart'
 import { firePurchaseOnce } from '@/components/Analytics'
 
-const LOGO_URL = 'https://customer-assets-jt897jd0.emergentagent.net/job_timeless-crafted-8/artifacts/xkx14q2d_ARK%20LOGO.jpeg'
+import { LOGO_URL } from '@/lib/brand'
 
 const STATUS_LABEL = {
   PAYMENT_PENDING:  { text: 'Payment pending confirmation',   tone: 'text-gold' },

@@ -14,7 +14,7 @@ import CraftJourney from '@/components/CraftJourney'
 import LuxuryVideo from '@/components/LuxuryVideo'
 
 /* ---------------------- ASSETS ---------------------- */
-const LOGO_URL = 'https://customer-assets-jt897jd0.emergentagent.net/job_timeless-crafted-8/artifacts/xkx14q2d_ARK%20LOGO.jpeg'
+import { LOGO_URL } from '@/lib/brand'
 
 const IMG = {
   // Hero: Kanjivaram bridal with jasmine + kaasu maalai — authentic South Indian
