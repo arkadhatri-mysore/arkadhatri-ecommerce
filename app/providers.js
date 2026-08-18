@@ -4,6 +4,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import WhatsAppFloat from '@/components/WhatsAppFloat';
+import Analytics from '@/components/Analytics';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -17,6 +18,7 @@ const queryClient = new QueryClient({
 export function Providers({ children }) {
   return (
     <QueryClientProvider client={queryClient}>
+      <Analytics />
       {children}
       <WhatsAppFloat />
     </QueryClientProvider>

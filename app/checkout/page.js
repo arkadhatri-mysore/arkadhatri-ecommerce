@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import Script from 'next/script'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, ShieldCheck, Lock } from 'lucide-react'
 import { cart, inr } from '@/lib/cart'
 import CouponBox from '@/components/CouponBox'
+import { trackEvent } from '@/components/Analytics'
 
 const LOGO_URL = 'https://customer-assets-jt897jd0.emergentagent.net/job_timeless-crafted-8/artifacts/xkx14q2d_ARK%20LOGO.jpeg'
 
@@ -25,6 +27,7 @@ const CheckoutPage = () => {
   })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const RZP_KEY_ID = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || ''
 
   useEffect(() => {
     setItems(cart.get())
@@ -35,6 +38,15 @@ const CheckoutPage = () => {
       const c = JSON.parse(sessionStorage.getItem('ark_coupon') || 'null')
       if (c) setCoupon(c)
     } catch {}
+    // Analytics: begin_checkout
+    const cs = cart.get()
+    if (cs.length > 0) {
+      trackEvent('begin_checkout', {
+        value: cs.reduce((s, i) => s + i.price * i.qty, 0),
+        currency: 'INR',
+        items: cs.map(i => ({ item_id: i.sku, item_name: i.name, price: i.price, quantity: i.qty }))
+      })
+    }
     return () => window.removeEventListener('cart:changed', sync)
   }, [router])
 
@@ -57,17 +69,69 @@ const CheckoutPage = () => {
     try { sessionStorage.removeItem('ark_coupon') } catch {}
   }
 
+  const openRazorpay = ({ order, payment }) => new Promise((resolve, reject) => {
+    if (typeof window === 'undefined' || !window.Razorpay) {
+      return reject(new Error('Razorpay Checkout not loaded. Please refresh and try again.'))
+    }
+    const rzp = new window.Razorpay({
+      key: payment.keyId,
+      amount: payment.amount,
+      currency: 'INR',
+      name: 'ARKADHATRI',
+      description: `Order ${order.id}`,
+      order_id: payment.razorpayOrderId,
+      prefill: { name: order.customer.fullName, email: order.customer.email, contact: order.customer.mobile },
+      theme: { color: '#4A0F1C' },
+      timeout: 900,
+      retry: { enabled: true },
+      notes: { orderId: order.id },
+      handler: async (response) => {
+        try {
+          const r = await fetch('/api/payments/razorpay/verify', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              orderId: order.id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature
+            })
+          })
+          const d = await r.json()
+          if (!r.ok || !d.ok) return reject(new Error(d.error || 'Payment verification failed'))
+          resolve({ verified: true, captured: !!d.captured, order: d.order || order })
+        } catch (e) { reject(e) }
+      },
+      modal: {
+        confirm_close: true,
+        ondismiss: async () => {
+          // Best-effort record; do NOT release stock yet — customer might complete on webhook.
+          try {
+            await fetch('/api/payments/razorpay/cancel', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ orderId: order.id })
+            })
+          } catch {}
+          reject(new Error('Payment was not completed. Please try again.'))
+        }
+      }
+    })
+    rzp.on?.('payment.failed', (resp) => {
+      reject(new Error(resp?.error?.description || 'Payment failed'))
+    })
+    rzp.open()
+  })
+
   const submit = async (e) => {
     e.preventDefault()
+    if (submitting) return // prevent double click
     setError(''); setSubmitting(true)
     try {
+      // 1) Create internal order + Razorpay order server-side (single call)
       const res = await fetch('/api/orders', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           items: items.map(({ sku, slug, name, price, qty }) => ({ sku, slug, name, price, qty })),
           customer: form,
-          subtotal, shipping,
-          total: subtotal + shipping, // backend re-applies coupon safely
           couponCode: coupon?.code,
           currency: 'INR'
         })
@@ -75,18 +139,33 @@ const CheckoutPage = () => {
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || 'Unable to place order')
 
-      // MVP: skip live Razorpay unless keys are provided; complete order in demo/pending mode.
+      const { order, payment } = data
+
+      // 2) Live Razorpay path — key must be present client-side AND server returned non-mocked
+      if (!payment?.mocked && RZP_KEY_ID && payment?.razorpayOrderId) {
+        await openRazorpay({ order, payment: { ...payment, keyId: payment.keyId || RZP_KEY_ID } })
+        // Payment verified server-side. Clear cart, coupon, and redirect.
+        cart.clear()
+        try { sessionStorage.removeItem('ark_coupon') } catch {}
+        router.push(`/order-success/${order.id}`)
+        return
+      }
+
+      // 3) Mocked mode — order recorded in PAYMENT_PENDING; concierge will confirm.
       cart.clear()
       try { sessionStorage.removeItem('ark_coupon') } catch {}
-      router.push(`/order-success/${data.order.id}`)
+      router.push(`/order-success/${order.id}`)
     } catch (err) {
-      setError(err.message)
+      setError(err.message || 'Something went wrong. Please try again.')
       setSubmitting(false)
     }
   }
 
   return (
     <main className="min-h-screen bg-luxury-ivory">
+      {RZP_KEY_ID && (
+        <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" />
+      )}
       <header className="sticky top-0 z-40 bg-luxury-ivory/95 backdrop-blur-md border-b border-burgundy-ink/10">
         <div className="container flex items-center justify-between py-4">
           <Link href="/cart" className="flex items-center gap-2 text-burgundy-ink hover:text-gold transition-colors group">
@@ -136,7 +215,11 @@ const CheckoutPage = () => {
                   <div className="mt-2 flex items-center gap-2 font-cinzel text-[0.55rem] tracking-[0.3em] text-gold"><Lock size={11} strokeWidth={1.5} />256-BIT SSL ENCRYPTED</div>
                 </div>
               </label>
-              <p className="mt-3 font-cormorant italic text-burgundy-ink/50 text-xs">Note: Payment gateway keys pending. This order will be recorded as \u201cpending payment\u201d and our concierge will confirm the payment link with you within one working day.</p>
+              <p className="mt-3 font-cormorant italic text-burgundy-ink/50 text-xs">
+                {RZP_KEY_ID
+                  ? 'Payment gateway will open securely for you to complete payment via UPI, cards, netbanking or wallets.'
+                  : 'Note: The atelier will send you a secure payment link within one working day. Your order is reserved.'}
+              </p>
             </div>
 
             {error && <p className="font-cormorant italic text-red-800">{error}</p>}

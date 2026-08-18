@@ -10,6 +10,7 @@ import { getProduct, getRelated } from '@/lib/products'
 import { cart, inr } from '@/lib/cart'
 import TrustStrip from '@/components/TrustStrip'
 import LuxuryVideo from '@/components/LuxuryVideo'
+import { trackEvent } from '@/components/Analytics'
 
 const LOGO_URL = 'https://customer-assets-jt897jd0.emergentagent.net/job_timeless-crafted-8/artifacts/xkx14q2d_ARK%20LOGO.jpeg'
 
@@ -96,14 +97,21 @@ const AddToBag = ({ product, variant = 'primary' }) => {
   }, [added])
   const click = (e) => {
     e.preventDefault()
+    const evt = {
+      value: product.price,
+      currency: 'INR',
+      items: [{ item_id: product.sku, item_name: product.name, price: product.price, quantity: 1 }]
+    }
     if (variant === 'secondary') {
       // Buy Now — add and go to checkout
       cart.add(product)
+      trackEvent('add_to_cart', evt)
       router.push('/checkout')
       return
     }
     if (added) return
     cart.add(product)
+    trackEvent('add_to_cart', evt)
     setAdded(true)
   }
   const base = 'flex-1 h-14 inline-flex items-center justify-center font-cinzel text-[0.68rem] tracking-[0.28em] uppercase rounded-md transition-all duration-300'
@@ -329,7 +337,15 @@ const ProductPage = () => {
   const related = getRelated(slug, 4)
 
   useEffect(() => {
-    if (product) document.title = product.seoTitle || `${product.name} — ARKADHATRI`
+    if (product) {
+      document.title = product.seoTitle || `${product.name} — ARKADHATRI`
+      // Analytics: view_item
+      trackEvent('view_item', {
+        currency: 'INR',
+        value: product.price,
+        items: [{ item_id: product.sku, item_name: product.name, price: product.price, item_category: product.collectionName, quantity: 1 }]
+      })
+    }
   }, [product])
 
   if (!product) {
