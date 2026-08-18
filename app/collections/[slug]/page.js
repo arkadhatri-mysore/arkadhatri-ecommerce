@@ -168,6 +168,44 @@ const CollectionPage = () => {
         </div>
       </section>
 
+      {/* Collection editorial (only for craft-heavy collections) */}
+      {['silk-sarees','wedding-sarees','festival-sarees'].includes(slug) && (
+        <section className="bg-luxury-ivory py-14 md:py-20 border-b border-burgundy-ink/5">
+          <div className="container grid md:grid-cols-2 gap-10 md:gap-16 items-center">
+            <div>
+              <div className="font-cinzel text-[0.6rem] tracking-[0.35em] uppercase text-gold mb-4">— THE STORY BEHIND THE WEAVE</div>
+              <h2 className="font-cormorant text-3xl md:text-4xl text-burgundy-ink leading-[1.15]">
+                {slug === 'wedding-sarees' && 'Woven for the days that stay in memory.'}
+                {slug === 'silk-sarees' && 'The signature weave of the South.'}
+                {slug === 'festival-sarees' && 'For the temple, the deepam and the family.'}
+              </h2>
+              <div className="h-px w-16 bg-gold my-6" />
+              <p className="font-cormorant text-lg text-burgundy-ink/75 leading-[1.65] max-w-lg">
+                {slug === 'wedding-sarees' && 'Kanjivaram silks composed on pit-looms in Kancheepuram, each carrying temple motifs, kaasu maalai borders and hand-inlaid zari — the saree becomes an heirloom the moment it is worn.'}
+                {slug === 'silk-sarees' && 'From the mulberry silk of Mysuru to the twist-yarn tradition of Kancheepuram — every ARKADHATRI silk is chosen for weight, drape and quiet character.'}
+                {slug === 'festival-sarees' && 'Refined silks with slim antique-gold borders and hand-inlaid zari — composed for Diwali evenings, Ugadi mornings, and every temple visit in between.'}
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { t: 'REGION',  n: slug === 'wedding-sarees' ? 'Kancheepuram' : 'Mysuru · Karnataka', img: 'https://images.unsplash.com/photo-1518893063132-36e46dbe2428?auto=format&fit=crop&w=600&q=85' },
+                { t: 'FABRIC',  n: 'Pure Mulberry Silk',            img: 'https://images.unsplash.com/photo-1612380635121-411eda9ecbb9?auto=format&fit=crop&w=600&q=85' },
+                { t: 'DETAIL',  n: 'Zari · Temple Border',          img: 'https://images.unsplash.com/photo-1630663124437-382b3831e7d8?auto=format&fit=crop&w=600&q=85' }
+              ].map((s) => (
+                <div key={s.t} className="relative aspect-[3/4] overflow-hidden rounded-sm group">
+                  <img src={s.img} alt={s.n} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                  <div className="absolute inset-0 bg-gradient-to-b from-burgundy-ink/10 via-transparent to-burgundy-ink/80" />
+                  <div className="absolute bottom-3 left-3 right-3">
+                    <div className="font-cinzel text-[0.5rem] tracking-[0.3em] text-gold">{s.t}</div>
+                    <div className="font-cormorant text-ivory text-sm mt-0.5 leading-tight">{s.n}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Filter bar */}
       <div className="sticky top-[68px] z-30 bg-luxury-ivory/95 backdrop-blur-md border-b border-burgundy-ink/10">
         <div className="container flex items-center justify-between py-3 gap-4">

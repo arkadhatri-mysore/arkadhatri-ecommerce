@@ -5,21 +5,44 @@ import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, ShoppingBag, Plus, Minus, X, ShieldCheck, Truck, RotateCcw } from 'lucide-react'
 import { cart, inr } from '@/lib/cart'
+import CouponBox from '@/components/CouponBox'
 
 const LOGO_URL = 'https://customer-assets-jt897jd0.emergentagent.net/job_timeless-crafted-8/artifacts/xkx14q2d_ARK%20LOGO.jpeg'
 
 const CartPage = () => {
   const [items, setItems] = useState([])
+  const [coupon, setCoupon] = useState(null)
   useEffect(() => {
     setItems(cart.get())
     const sync = () => setItems(cart.get())
     window.addEventListener('cart:changed', sync)
+    // Restore coupon from session
+    try {
+      const c = JSON.parse(sessionStorage.getItem('ark_coupon') || 'null')
+      if (c) setCoupon(c)
+    } catch {}
     return () => window.removeEventListener('cart:changed', sync)
   }, [])
 
   const subtotal = items.reduce((s, i) => s + i.price * i.qty, 0)
   const shipping = subtotal >= 15000 || subtotal === 0 ? 0 : 250
-  const total = subtotal + shipping
+  // Recompute discount whenever subtotal changes (for percentage coupons)
+  const discount = coupon
+    ? (coupon.type === 'percentage'
+        ? Math.round(subtotal * (Number(coupon.value) / 100))
+        : Number(coupon.value) || 0)
+    : 0
+  const total = Math.max(0, subtotal + shipping - discount)
+
+  const applyCoupon = (c) => {
+    const next = { ...c }
+    setCoupon(next)
+    try { sessionStorage.setItem('ark_coupon', JSON.stringify(next)) } catch {}
+  }
+  const removeCoupon = () => {
+    setCoupon(null)
+    try { sessionStorage.removeItem('ark_coupon') } catch {}
+  }
 
   return (
     <main className="min-h-screen bg-luxury-ivory">
@@ -92,10 +115,29 @@ const CartPage = () => {
                     <dt>Shipping</dt>
                     <dd>{shipping === 0 ? <span className="text-gold">Complimentary</span> : `₹ ${inr(shipping)}`}</dd>
                   </div>
+                  {discount > 0 && (
+                    <div className="flex justify-between font-cormorant text-gold">
+                      <dt>Discount {coupon?.code ? `(${coupon.code})` : ''}</dt>
+                      <dd>− ₹ {inr(discount)}</dd>
+                    </div>
+                  )}
                   {subtotal > 0 && subtotal < 15000 && (
                     <div className="text-xs font-cormorant italic text-burgundy-ink/60">Free shipping on orders above ₹ 15,000</div>
                   )}
                 </dl>
+
+                {/* Coupon input */}
+                {subtotal > 0 && (
+                  <div className="mt-5">
+                    <CouponBox
+                      subtotal={subtotal}
+                      applied={coupon}
+                      onApply={applyCoupon}
+                      onRemove={removeCoupon}
+                    />
+                  </div>
+                )}
+
                 <div className="my-5 border-t border-burgundy-ink/15" />
                 <div className="flex justify-between items-baseline">
                   <span className="font-cinzel text-[0.65rem] tracking-[0.35em] text-burgundy-ink">TOTAL</span>

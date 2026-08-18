@@ -10,6 +10,8 @@ import Link from 'next/link'
 import { cart, inr } from '@/lib/cart'
 import { PRODUCTS } from '@/lib/products'
 import SearchOverlay from '@/components/SearchOverlay'
+import CraftJourney from '@/components/CraftJourney'
+import LuxuryVideo from '@/components/LuxuryVideo'
 
 /* ---------------------- ASSETS ---------------------- */
 const LOGO_URL = 'https://customer-assets-jt897jd0.emergentagent.net/job_timeless-crafted-8/artifacts/xkx14q2d_ARK%20LOGO.jpeg'
@@ -158,6 +160,7 @@ const Nav = () => {
   const links = [
     { name: 'Home', href: '#top' },
     { name: 'Collections', href: '#collections', hasSub: true },
+    { name: 'Craft', href: '#craft' },
     { name: 'About', href: '#story' },
     { name: 'Contact', href: '#contact' }
   ]
@@ -261,11 +264,23 @@ const Nav = () => {
   )
 }
 
-/* ---------------------- HERO ---------------------- */
+/* ---------------- HERO ---------------- */
+const HERO_VIDEO = process.env.NEXT_PUBLIC_HERO_VIDEO_URL || ''
 const Hero = () => (
   <section id="top" className="relative min-h-[100svh] w-full overflow-hidden bg-burgundy-ink">
     <div className="absolute inset-0">
-      <img src={IMG.hero} alt="ARKADHATRI South Indian Silk Saree" className="w-full h-full object-cover" />
+      {HERO_VIDEO ? (
+        <LuxuryVideo
+          src={HERO_VIDEO}
+          poster={IMG.hero}
+          alt="ARKADHATRI South Indian Silk Saree"
+          ratio="16/9"
+          className="!aspect-auto w-full h-full"
+          controls="none"
+        />
+      ) : (
+        <img src={IMG.hero} alt="ARKADHATRI South Indian Silk Saree" className="w-full h-full object-cover" />
+      )}
       <div className="absolute inset-0 bg-gradient-to-b from-burgundy-ink/70 via-burgundy/45 to-burgundy-ink/90" />
       <div className="absolute inset-0 bg-burgundy/25" />
     </div>
@@ -287,8 +302,9 @@ const Hero = () => (
         className="mt-2 font-cormorant text-lg md:text-xl text-ivory/80 max-w-2xl">
         Curated Sarees Inspired by Tradition
       </motion.p>
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, delay: 0.95 }} className="mt-10">
-        <a href="#collections" className="btn-luxury-filled">Shop Collection</a>
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, delay: 0.95 }} className="mt-10 flex flex-col sm:flex-row items-center gap-4">
+        <a href="#collections" className="btn-luxury-filled">Explore the Collection</a>
+        <a href="#craft" className="btn-luxury">Discover the Craft</a>
       </motion.div>
     </div>
   </section>
@@ -632,6 +648,7 @@ const App = () => (
     <Featured />
     <Why />
     <Story />
+    <div id="craft"><CraftJourney variant="dark" videoUrl={process.env.NEXT_PUBLIC_CRAFT_VIDEO_URL || ''} posterUrl="https://images.unsplash.com/photo-1623171404570-1d196759fe20?auto=format&fit=crop&w=2000&q=85" /></div>
     <Reviews />
     <InstaGrid />
     <Newsletter />

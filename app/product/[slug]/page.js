@@ -5,10 +5,11 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, ChevronRight, Heart, Plus, Minus, ShoppingBag, Truck, RotateCcw, ShieldCheck, MapPin, Instagram, Youtube } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Heart, Plus, Minus, ShoppingBag, Truck, RotateCcw, ShieldCheck, MapPin, Instagram, Youtube, Sparkles, Flower2, Award } from 'lucide-react'
 import { getProduct, getRelated } from '@/lib/products'
 import { cart, inr } from '@/lib/cart'
 import TrustStrip from '@/components/TrustStrip'
+import LuxuryVideo from '@/components/LuxuryVideo'
 
 const LOGO_URL = 'https://customer-assets-jt897jd0.emergentagent.net/job_timeless-crafted-8/artifacts/xkx14q2d_ARK%20LOGO.jpeg'
 
@@ -177,6 +178,50 @@ const Accordion = ({ items }) => {
         )
       })}
     </div>
+  )
+}
+
+/* ---------------- Craft Strip (compact, product-level) ---------------- */
+const CraftStrip = ({ product }) => {
+  const details = product.details || {}
+  const region = product.collection === 'wedding-sarees' || product.fabricType?.includes('Kanjivaram') ? 'Kancheepuram · Tamil Nadu' : 'Mysuru · Karnataka'
+  const chips = [
+    { i: MapPin,   t: 'REGION',   v: region },
+    { i: Flower2,  t: 'FABRIC',   v: product.fabricType || details.Fabric?.split(',')[0] || 'Pure Silk' },
+    { i: Sparkles, t: 'DETAIL',   v: (details.Colour?.split(' with ')[1] || 'Antique-gold zari').replace(/\.$/, '') },
+    { i: Award,    t: 'OCCASION', v: (product.occasion?.[0] || 'Festive') }
+  ]
+  return (
+    <div className="mt-10 grid grid-cols-2 md:grid-cols-4 gap-3">
+      {chips.map((c) => (
+        <div key={c.t} className="border border-burgundy-ink/10 rounded-sm p-4 bg-white/50 hover:border-gold/50 transition-colors">
+          <div className="flex items-center gap-2">
+            <c.i size={14} strokeWidth={1.4} className="text-gold" />
+            <div className="font-cinzel text-[0.5rem] tracking-[0.3em] uppercase text-burgundy-ink/70">{c.t}</div>
+          </div>
+          <div className="mt-2 font-cormorant text-base leading-snug text-burgundy-ink">{c.v}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/* ---------------- Product Video Slot ---------------- */
+const ProductVideoSlot = ({ product }) => {
+  const src = product.videoUrl
+  const poster = product.videoPoster || product.images?.[0]
+  // Render only when either a video or a dedicated craft poster is present
+  if (!src && !product.videoPoster) return null
+  return (
+    <section className="mt-14">
+      <div className="text-center mb-6">
+        <div className="eyebrow mb-3" style={{color:'#C8A45A'}}>— SEE THE SAREE IN MOTION</div>
+        <h2 className="font-cormorant text-3xl md:text-4xl text-burgundy-ink">The drape, up close.</h2>
+      </div>
+      <div className="rounded-sm overflow-hidden border border-burgundy-ink/10 shadow-[0_20px_60px_-30px_rgba(74,15,28,0.4)] max-w-4xl mx-auto">
+        <LuxuryVideo src={src} poster={poster} alt={`${product.name} — saree in motion`} ratio="16/9" />
+      </div>
+    </section>
   )
 }
 
@@ -377,12 +422,18 @@ const ProductPage = () => {
 
             <Trust />
 
+            {/* Craft strip: region · fabric · detail · occasion */}
+            <CraftStrip product={product} />
+
             {/* Accordion */}
             <div className="mt-12">
               <Accordion items={Object.entries(product.details)} />
             </div>
           </div>
         </div>
+
+        {/* Product video slot (renders only if a video URL or dedicated poster is set) */}
+        <ProductVideoSlot product={product} />
       </div>
 
       <Related items={related} />

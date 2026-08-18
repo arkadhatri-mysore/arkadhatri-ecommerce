@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, ShieldCheck, Lock } from 'lucide-react'
 import { cart, inr } from '@/lib/cart'
+import CouponBox from '@/components/CouponBox'
 
 const LOGO_URL = 'https://customer-assets-jt897jd0.emergentagent.net/job_timeless-crafted-8/artifacts/xkx14q2d_ARK%20LOGO.jpeg'
 
@@ -16,6 +17,7 @@ const input = 'w-full bg-transparent border border-burgundy-ink/20 focus:border-
 const CheckoutPage = () => {
   const router = useRouter()
   const [items, setItems] = useState([])
+  const [coupon, setCoupon] = useState(null)
   const [form, setForm] = useState({
     fullName: '', email: '', mobile: '',
     address1: '', address2: '', city: '', state: 'Karnataka', pincode: '',
@@ -29,13 +31,31 @@ const CheckoutPage = () => {
     if (cart.count() === 0) router.replace('/cart')
     const sync = () => setItems(cart.get())
     window.addEventListener('cart:changed', sync)
+    try {
+      const c = JSON.parse(sessionStorage.getItem('ark_coupon') || 'null')
+      if (c) setCoupon(c)
+    } catch {}
     return () => window.removeEventListener('cart:changed', sync)
   }, [router])
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
   const subtotal = items.reduce((s, i) => s + i.price * i.qty, 0)
   const shipping = subtotal >= 15000 || subtotal === 0 ? 0 : 250
-  const total = subtotal + shipping
+  const discount = coupon
+    ? (coupon.type === 'percentage'
+        ? Math.round(subtotal * (Number(coupon.value) / 100))
+        : Number(coupon.value) || 0)
+    : 0
+  const total = Math.max(0, subtotal + shipping - discount)
+
+  const applyCoupon = (c) => {
+    setCoupon(c)
+    try { sessionStorage.setItem('ark_coupon', JSON.stringify(c)) } catch {}
+  }
+  const removeCoupon = () => {
+    setCoupon(null)
+    try { sessionStorage.removeItem('ark_coupon') } catch {}
+  }
 
   const submit = async (e) => {
     e.preventDefault()
@@ -45,7 +65,11 @@ const CheckoutPage = () => {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           items: items.map(({ sku, slug, name, price, qty }) => ({ sku, slug, name, price, qty })),
-          customer: form, subtotal, shipping, total, currency: 'INR'
+          customer: form,
+          subtotal, shipping,
+          total: subtotal + shipping, // backend re-applies coupon safely
+          couponCode: coupon?.code,
+          currency: 'INR'
         })
       })
       const data = await res.json()
@@ -53,6 +77,7 @@ const CheckoutPage = () => {
 
       // MVP: skip live Razorpay unless keys are provided; complete order in demo/pending mode.
       cart.clear()
+      try { sessionStorage.removeItem('ark_coupon') } catch {}
       router.push(`/order-success/${data.order.id}`)
     } catch (err) {
       setError(err.message)
@@ -144,7 +169,22 @@ const CheckoutPage = () => {
               <dl className="space-y-2 text-sm">
                 <div className="flex justify-between font-cormorant text-burgundy-ink/80"><dt>Subtotal</dt><dd>₹ {inr(subtotal)}</dd></div>
                 <div className="flex justify-between font-cormorant text-burgundy-ink/80"><dt>Shipping</dt><dd>{shipping === 0 ? <span className="text-gold">Complimentary</span> : `₹ ${inr(shipping)}`}</dd></div>
+                {discount > 0 && (
+                  <div className="flex justify-between font-cormorant text-gold"><dt>Discount {coupon?.code ? `(${coupon.code})` : ''}</dt><dd>− ₹ {inr(discount)}</dd></div>
+                )}
               </dl>
+
+              {/* Coupon */}
+              <div className="mt-4">
+                <CouponBox
+                  subtotal={subtotal}
+                  applied={coupon}
+                  onApply={applyCoupon}
+                  onRemove={removeCoupon}
+                  compact
+                />
+              </div>
+
               <div className="my-4 border-t border-burgundy-ink/15" />
               <div className="flex justify-between items-baseline">
                 <span className="font-cinzel text-[0.65rem] tracking-[0.35em] text-burgundy-ink">TOTAL</span>
