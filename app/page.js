@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { cart, inr } from '@/lib/cart'
-import { PRODUCTS } from '@/lib/products'
+import { useCatalog } from '@/lib/catalog'
 import SearchOverlay from '@/components/SearchOverlay'
 import CraftJourney from '@/components/CraftJourney'
 import LuxuryVideo from '@/components/LuxuryVideo'
@@ -348,17 +348,28 @@ const Collections = () => (
 )
 
 /* ---------------------- FEATURED COLLECTION ---------------------- */
-const Featured = () => (
+const Featured = () => {
+  const { products, loading } = useCatalog()
+  const featured = products.slice(0, 8).map((p) => ({
+    name: p.name, sku: p.sku, slug: p.slug, price: p.price,
+    desc: p.tagline, img: p.images?.[0], isNew: p.isNew, inStock: p.inStock
+  }))
+  return (
   <section id="featured" className="bg-burgundy-deep py-24 md:py-32">
     <div className="container">
       <motion.div {...fadeUp} className="text-center mb-14 md:mb-20">
         <div className="eyebrow mb-4">— FEATURED COLLECTION</div>
-        <h2 className="font-cormorant text-4xl md:text-6xl text-ivory">Eight Signature Sarees</h2>
+        <h2 className="font-cormorant text-4xl md:text-6xl text-ivory">Signature Sarees</h2>
         <p className="mt-4 font-cormorant italic text-warm-grey text-lg">Handpicked from our current curation.</p>
       </motion.div>
 
+      {loading && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 animate-pulse">
+          {[0, 1, 2, 3].map((i) => <div key={i} className="aspect-[3/4] bg-ivory/5 rounded-sm" />)}
+        </div>
+      )}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-        {IMG.featured.map((p, i) => (
+        {featured.map((p, i) => (
           <motion.div
             key={p.name}
             initial={{ opacity: 0, y: 20 }}
@@ -369,7 +380,7 @@ const Featured = () => (
           >
             <a href={`/product/${p.slug}`} className="block luxury-card relative aspect-[3/4] mb-4">
               <img src={p.img} alt={p.name} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
-              {i === 4 && <span className="absolute top-3 left-3 px-2.5 py-1 bg-burgundy-ink/85 border border-gold/40 font-cinzel text-[0.5rem] tracking-[0.3em] text-gold">NEW</span>}
+              {p.isNew && <span className="absolute top-3 left-3 px-2.5 py-1 bg-burgundy-ink/85 border border-gold/40 font-cinzel text-[0.5rem] tracking-[0.3em] text-gold">NEW</span>}
               {/* hover actions */}
               <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-500">
                 <button aria-label="Wishlist" className="w-9 h-9 bg-burgundy-ink/85 border border-gold/40 flex items-center justify-center hover:bg-gold group/i transition-colors rounded-sm">
@@ -377,7 +388,9 @@ const Featured = () => (
                 </button>
               </div>
               <div className="absolute bottom-3 left-3 right-3 opacity-0 translate-y-3 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-500">
-                <AddToBagButton product={{ ...p, images: [p.img], sku: p.sku, currency: '\u20b9' }} size="sm" />
+                {p.inStock === false
+                  ? <div className="h-10 flex items-center justify-center bg-burgundy-ink/85 border border-gold/30 font-cinzel text-[0.55rem] tracking-[0.3em] text-ivory/80">SOLD OUT</div>
+                  : <AddToBagButton product={{ ...p, images: [p.img], sku: p.sku, currency: '\u20b9' }} size="sm" />}
               </div>
             </a>
             <div className="flex items-start justify-between gap-2">
@@ -399,7 +412,8 @@ const Featured = () => (
       </motion.div>
     </div>
   </section>
-)
+  )
+}
 
 /* ---------------------- WHY CHOOSE ARKADHATRI ---------------------- */
 const Why = () => {

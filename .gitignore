@@ -97,3 +97,8 @@ Thumbs.db
 *.log
 supervisord.log
 supervisord.pid
+.env.*
+*.env
+credentials.json
+*.key
+.credentials

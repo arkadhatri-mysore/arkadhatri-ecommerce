@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Trash2, Save, Plus, X } from 'lucide-react'
+import { FABRIC_CARE, careKeyFor } from '@/lib/care-guide'
+import { isSampleImage } from '@/lib/products'
 
 const STATUSES = ['draft', 'published', 'hidden', 'out-of-stock']
 const COLLECTIONS = ['silk-sarees', 'wedding-sarees', 'festival-sarees', 'everyday-elegance', 'new-arrivals']
@@ -18,6 +20,7 @@ const empty = {
   description: '',
   details: { Fabric: '', Colour: '', Occasion: '', 'Blouse Piece': '', 'Wash Care': '', Delivery: '', Returns: '' },
   weave: '', border: '', sareeLength: '',
+  careTips: '', drapingNote: '',
   seoTitle: '', seoDescription: '', metaKeywords: '',
   tags: [], isNew: false, isBestseller: false, isTrending: false, isLimited: false
 }
@@ -142,7 +145,12 @@ export default function ProductEditor() {
               <input value={newImg} onChange={e => setNewImg(e.target.value)} placeholder="Paste image URL" className={`${inp} flex-1`} />
               <button onClick={addImg} type="button" className="inline-flex items-center gap-1 bg-[#4A0F1C] hover:bg-[#3A0B15] text-white font-inter text-sm px-4 rounded transition-colors"><Plus size={14} /> Add</button>
             </div>
-            <p className="font-inter text-xs text-[#4A0F1C]/50 mt-2">First image is the featured / cover image. Direct URLs recommended; upload widget coming next.</p>
+            <p className="font-inter text-xs text-[#4A0F1C]/50 mt-2">The first image is the cover. Paste direct image links (ending in .jpg, .png or .webp) and save. They appear on the shop straight away.</p>
+            {p.images.some(isSampleImage) && (
+              <p data-testid="sample-image-warning" className="font-inter text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2 mt-2">
+                Some images are still sample stock photos. While the cover is a sample photo, the shop shows a &ldquo;Studio photo pending&rdquo; tag. Replace it with your own photo to remove the tag.
+              </p>
+            )}
           </Section>
 
           <Section title="Video (optional)">
@@ -155,6 +163,31 @@ export default function ProductEditor() {
               </Field>
             </div>
             <p className="font-inter text-xs text-[#4A0F1C]/50">Adds a &ldquo;See the saree in motion&rdquo; strip on the product page. Leave blank to hide.</p>
+          </Section>
+
+          <Section title="Care & Draping Guide">
+            {(() => {
+              const def = FABRIC_CARE[careKeyFor(p)]
+              return (
+                <>
+                  <p className="font-inter text-xs text-[#4A0F1C]/60">
+                    Every product page shows a Care &amp; Draping guide. Leave the care tips empty to use the ready-made
+                    <b> {def.title}</b> guide (picked from the Fabric Type). The 6 draping steps are the same on every saree.
+                  </p>
+                  <Field label="Custom care tips for this saree (one tip per line, optional)">
+                    <textarea data-testid="care-tips-input" rows={5} value={p.careTips} onChange={e => set('careTips', e.target.value)} className={inp} placeholder={def.tips.join('\n')} />
+                  </Field>
+                  {!p.careTips && (
+                    <button type="button" onClick={() => set('careTips', def.tips.join('\n'))} className="font-inter text-xs text-[#C8A45A] hover:underline">
+                      Copy the ready-made tips here so I can edit them
+                    </button>
+                  )}
+                  <Field label="Draping note for this saree (optional, shown under the draping steps)">
+                    <textarea data-testid="draping-note-input" rows={2} value={p.drapingNote} onChange={e => set('drapingNote', e.target.value)} className={inp} placeholder="e.g. The pallu is heavy with zari. Use two pins at the shoulder." />
+                  </Field>
+                </>
+              )
+            })()}
           </Section>
 
           <Section title="SEO">

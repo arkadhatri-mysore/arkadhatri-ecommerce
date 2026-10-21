@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Heart, ArrowRight } from 'lucide-react'
 import { cart, inr } from '@/lib/cart'
+import { isSampleImage } from '@/lib/products'
 
 /**
  * Reusable ProductCard for all product listings.
@@ -37,7 +38,7 @@ const ProductCard = ({ p, variant = 'ivory', showPlaceholder = true }) => {
     <article className="group flex flex-col">
       {/* Image */}
       <Link href={`/product/${p.slug}`} className="relative block aspect-[3/4] overflow-hidden rounded-sm bg-burgundy-ink/5 mb-4">
-        {showPlaceholder && (
+        {showPlaceholder && isSampleImage(p.images?.[0] || p.image) && (
           <span className="absolute top-3 left-3 z-10 px-2 py-1 bg-burgundy-ink/80 backdrop-blur-sm border border-gold/40 rounded-sm font-cinzel text-[0.5rem] tracking-[0.25em] text-gold/95">
             STUDIO PHOTO PENDING
           </span>

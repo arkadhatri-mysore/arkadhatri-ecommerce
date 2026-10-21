@@ -7,6 +7,8 @@ import { useParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, ChevronRight, Heart, Plus, Minus, ShoppingBag, Truck, RotateCcw, ShieldCheck, MapPin, Instagram, Youtube, Sparkles, Flower2, Award } from 'lucide-react'
 import { getProduct, getRelated } from '@/lib/products'
+import { useCatalog } from '@/lib/catalog'
+import CareGuide from '@/components/CareGuide'
 import { cart, inr } from '@/lib/cart'
 import TrustStrip from '@/components/TrustStrip'
 import LuxuryVideo from '@/components/LuxuryVideo'
@@ -50,8 +52,15 @@ const Header = () => {
 }
 
 /* ---------------- Gallery ---------------- */
-const Gallery = ({ images, name }) => {
+const Gallery = ({ images = [], name }) => {
   const [active, setActive] = useState(0)
+  if (!images.length) {
+    return (
+      <div className="relative aspect-[4/5] rounded-sm bg-burgundy-ink/5 border border-burgundy-ink/10 flex items-center justify-center">
+        <span className="font-cinzel text-[0.6rem] tracking-[0.35em] text-burgundy-ink/50">STUDIO PHOTOS COMING SOON</span>
+      </div>
+    )
+  }
   return (
     <div className="grid md:grid-cols-[100px_1fr] gap-4 md:gap-6">
       {/* Thumbnails (vertical on md+, horizontal on mobile — flipped order for mobile) */}
@@ -115,6 +124,14 @@ const AddToBag = ({ product, variant = 'primary' }) => {
     setAdded(true)
   }
   const base = 'flex-1 h-14 inline-flex items-center justify-center font-cinzel text-[0.68rem] tracking-[0.28em] uppercase rounded-md transition-all duration-300'
+  if (product.inStock === false) {
+    if (variant !== 'primary') return null
+    return (
+      <button disabled data-testid="sold-out-btn" className={`${base} border-2 border-burgundy-ink/20 text-burgundy-ink/50 bg-transparent cursor-not-allowed`}>
+        Currently Sold Out
+      </button>
+    )
+  }
   if (variant === 'primary') {
     return (
       <motion.button
@@ -245,7 +262,7 @@ const Related = ({ items }) => (
         {items.map((p) => (
           <Link href={`/product/${p.slug}`} key={p.slug} className="group">
             <div className="luxury-card relative aspect-[3/4] mb-3 rounded-sm overflow-hidden">
-              <img src={p.images[0]} alt={p.name} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+              <img src={p.images?.[0]} alt={p.name} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
             </div>
             <div className="flex items-start justify-between gap-2">
               <div>
@@ -333,8 +350,9 @@ const Trust = () => (
 const ProductPage = () => {
   const params = useParams()
   const slug = params?.slug
-  const product = getProduct(slug)
-  const related = getRelated(slug, 4)
+  const { products, loading } = useCatalog()
+  const product = getProduct(slug, products)
+  const related = getRelated(slug, 4, products)
 
   useEffect(() => {
     if (product) {
@@ -347,6 +365,26 @@ const ProductPage = () => {
       })
     }
   }, [product])
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-luxury-ivory">
+        <Header />
+        <div className="container py-8 md:py-14" data-testid="product-loading">
+          <div className="grid md:grid-cols-2 gap-10 md:gap-16 animate-pulse">
+            <div className="aspect-[4/5] bg-burgundy-ink/5 rounded-sm" />
+            <div className="space-y-5 pt-6">
+              <div className="h-3 w-32 bg-burgundy-ink/10 rounded" />
+              <div className="h-12 w-2/3 bg-burgundy-ink/10 rounded" />
+              <div className="h-6 w-1/3 bg-burgundy-ink/10 rounded" />
+              <div className="h-24 w-full bg-burgundy-ink/5 rounded" />
+              <div className="h-14 w-full bg-burgundy-ink/10 rounded" />
+            </div>
+          </div>
+        </div>
+      </main>
+    )
+  }
 
   if (!product) {
     return (
@@ -370,7 +408,7 @@ const ProductPage = () => {
     brand: { '@type': 'Brand', name: 'ARKADHATRI' },
     offers: {
       '@type': 'Offer', priceCurrency: 'INR', price: product.price,
-      availability: 'https://schema.org/InStock',
+      availability: product.inStock === false ? 'https://schema.org/OutOfStock' : 'https://schema.org/InStock',
       url: `${site}/product/${product.slug}`
     }
   }
@@ -394,7 +432,7 @@ const ProductPage = () => {
         <nav className="text-[0.62rem] tracking-[0.3em] uppercase font-cinzel text-burgundy-ink/60 mb-8 flex items-center gap-2 flex-wrap">
           <Link href="/" className="hover:text-gold transition-colors">HOME</Link>
           <ChevronRight size={11} strokeWidth={1.3} />
-          <Link href="/#collections" className="hover:text-gold transition-colors">{product.collection.toUpperCase()}</Link>
+          <Link href="/#collections" className="hover:text-gold transition-colors">{(product.collectionName || product.collection || '').toUpperCase()}</Link>
           <ChevronRight size={11} strokeWidth={1.3} />
           <span className="text-gold">{product.name.toUpperCase()}</span>
         </nav>
@@ -408,7 +446,7 @@ const ProductPage = () => {
 
           {/* Right: details */}
           <div className="md:sticky md:top-24">
-            <div className="eyebrow mb-3">— {product.collection.toUpperCase()}</div>
+            <div className="eyebrow mb-3">— {(product.collectionName || product.collection || '').toUpperCase()}</div>
             <h1 className="font-cormorant text-4xl md:text-5xl lg:text-6xl text-burgundy-ink leading-[1.02]">
               {product.name}
             </h1>
@@ -443,13 +481,16 @@ const ProductPage = () => {
 
             {/* Accordion */}
             <div className="mt-12">
-              <Accordion items={Object.entries(product.details)} />
+              <Accordion items={Object.entries(product.details || {})} />
             </div>
           </div>
         </div>
 
         {/* Product video slot (renders only if a video URL or dedicated poster is set) */}
         <ProductVideoSlot product={product} />
+
+        {/* Care & Draping guide (fabric-based, editable per saree in Admin) */}
+        <CareGuide product={product} />
       </div>
 
       <Related items={related} />

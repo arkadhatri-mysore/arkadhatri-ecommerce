@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Search as SearchIcon, X, ArrowRight } from 'lucide-react'
 import { searchProducts, COLLECTIONS } from '@/lib/products'
 import { inr } from '@/lib/cart'
+import { useCatalog } from '@/lib/catalog'
 
 const SUGGESTIONS = ['Kanjivaram', 'Mysore Silk', 'Wedding', 'Bridal Red', 'Festival', 'Bhavana', 'Meenakshi']
 
@@ -19,7 +20,8 @@ const SearchOverlay = ({ open, onClose }) => {
     else { setQ(''); setResults([]) }
   }, [open])
 
-  useEffect(() => { setResults(searchProducts(q)) }, [q])
+  const { products } = useCatalog()
+  useEffect(() => { setResults(searchProducts(q, products)) }, [q, products])
 
   useEffect(() => {
     const esc = (e) => e.key === 'Escape' && onClose()
@@ -100,7 +102,7 @@ const SearchOverlay = ({ open, onClose }) => {
                           className="flex items-center gap-4 p-3 hover:bg-burgundy transition-colors rounded-sm group"
                         >
                           <div className="w-16 h-20 shrink-0 overflow-hidden rounded-sm bg-burgundy">
-                            <img src={p.images[0]} alt="" className="w-full h-full object-cover" />
+                            <img src={p.images?.[0]} alt="" className="w-full h-full object-cover" />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="font-cormorant text-lg md:text-xl text-ivory group-hover:text-gold transition-colors">{p.name}</div>

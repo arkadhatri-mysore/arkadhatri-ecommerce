@@ -161,6 +161,24 @@ backend:
         comment: |
           Changed dashboard aggregate to $match paymentStatus:'paid' before summing $total.
 
+  - task: "Public live catalog API (GET /api/catalog, GET /api/catalog/:slug)"
+    implemented: true
+    working: "NA"
+    file: "app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "critical"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          NEW. Storefront previously read a static file, so admin edits never showed on the shop.
+          GET /api/catalog returns products with status published|out-of-stock (draft/hidden excluded),
+          no _id, no metaKeywords, normalized currency/images/details (empty details removed), stock and
+          computed inStock (false when stock<=0 or status out-of-stock). GET /api/catalog/:slug returns one
+          or 404. Seeds DB from lib/products.js if products collection empty. Admin PUT of images/price/
+          careTips/drapingNote must reflect immediately in /api/catalog. Restore any product you modify.
+
 frontend:
   - task: "Razorpay Checkout client flow (loads only when NEXT_PUBLIC_RAZORPAY_KEY_ID present)"
     implemented: true
@@ -202,6 +220,18 @@ frontend:
     priority: "medium"
     needs_retesting: false
 
+  - task: "Storefront uses live catalog + Care & Draping guide + sold-out state + placeholder badge only on sample photos"
+    implemented: true
+    working: "NA"
+    file: "lib/catalog.js, lib/care-guide.js, components/CareGuide.js, app/product/[slug]/page.js, app/page.js, app/collections/[slug]/page.js, components/SearchOverlay.js, components/ProductCard.js, app/admin/products/[id]/page.js, app/sitemap.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Full-site bug sweep requested by user."
+
 metadata:
   created_by: "main_agent"
   version: "3.0"
@@ -210,6 +240,8 @@ metadata:
 
 test_plan:
   current_focus:
+    - "Public live catalog API (GET /api/catalog, GET /api/catalog/:slug)"
+    - "Full regression of all public + admin endpoints (bug sweep)"
     - "Order creation with server-side pricing + atomic stock reservation + optional Razorpay init"
     - "Razorpay verify — idempotent + atomic PAYMENT_PENDING->PAID transition"
     - "Razorpay webhook — signature verify + idempotent event handling"

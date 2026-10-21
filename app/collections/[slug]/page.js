@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronRight, ShoppingBag, SlidersHorizontal, X, ChevronDo
 import { getCollection, getProductsByCollection, getFilterOptions, COLLECTIONS } from '@/lib/products'
 import { cart } from '@/lib/cart'
 import ProductCard from '@/components/ProductCard'
+import { useCatalog } from '@/lib/catalog'
 import TrustStrip from '@/components/TrustStrip'
 
 import { LOGO_URL } from '@/lib/brand'
@@ -88,7 +89,8 @@ const PriceGroup = ({ range, setRange }) => {
 const CollectionPage = () => {
   const { slug } = useParams()
   const collection = getCollection(slug)
-  const base = getProductsByCollection(slug)
+  const { products, loading } = useCatalog()
+  const base = useMemo(() => getProductsByCollection(slug, products), [slug, products])
 
   useEffect(() => { if (collection) document.title = `${collection.name} \u2014 ARKADHATRI` }, [collection])
 
@@ -246,7 +248,11 @@ const CollectionPage = () => {
       {/* Grid */}
       <section className="py-14 md:py-20">
         <div className="container">
-          {filtered.length === 0 ? (
+          {loading ? (
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8 animate-pulse" data-testid="collection-loading">
+              {[0, 1, 2].map((i) => <div key={i} className="aspect-[3/4] bg-burgundy-ink/5 rounded-sm" />)}
+            </div>
+          ) : filtered.length === 0 ? (
             <div className="py-16 md:py-24 text-center max-w-xl mx-auto">
               <div className="eyebrow mb-4">— CURATING</div>
               <h2 className="font-cormorant text-3xl md:text-4xl text-burgundy-ink mb-4 leading-tight">
@@ -262,7 +268,7 @@ const CollectionPage = () => {
             </div>
           ) : (
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
-              {filtered.map((p) => <ProductCard key={p.sku} p={p} variant="ivory" />)}
+              {filtered.map((p) => <ProductCard key={p.sku || p.slug} p={p} variant="ivory" />)}
             </div>
           )}
         </div>

@@ -134,6 +134,42 @@ async function razorpayCreateOrder({ amount, currency = 'INR', receipt, notes = 
   return { mocked: false, keyId, order: d }
 }
 
+// -------- Catalog helpers --------
+let catalogSeeded = false
+async function seedCatalogIfEmpty(db) {
+  if (catalogSeeded) return
+  const count = await db.collection('products').countDocuments()
+  if (count === 0) {
+    const { PRODUCTS } = await import('@/lib/products')
+    if (PRODUCTS?.length) {
+      const now = Date.now()
+      await db.collection('products').insertMany(
+        PRODUCTS.map((p, i) => ({ ...p, id: uuidv4(), status: 'published', stock: 5, createdAt: new Date(now + i) }))
+      ).catch(() => {})
+    }
+  }
+  catalogSeeded = true
+}
+
+// Shape a DB product for the storefront. Never exposes internal admin-only fields.
+function publicProduct(p) {
+  const stock = Number(p.stock) || 0
+  const details = Object.fromEntries(
+    Object.entries(p.details || {}).filter(([, v]) => typeof v === 'string' && v.trim())
+  )
+  const { metaKeywords, ...rest } = p
+  return {
+    ...rest,
+    currency: p.currency || '\u20b9',
+    price: Number(p.price) || 0,
+    images: Array.isArray(p.images) ? p.images.filter(Boolean) : [],
+    occasion: Array.isArray(p.occasion) ? p.occasion : [],
+    details,
+    stock,
+    inStock: p.status !== 'out-of-stock' && stock > 0
+  }
+}
+
 // -------- OPTIONS --------
 export async function OPTIONS(request) {
   return applyCors(new NextResponse(null, { status: 200 }), request)
@@ -172,6 +208,23 @@ async function handleRoute(request, { params }) {
           metaPixel: Boolean(process.env.NEXT_PUBLIC_META_PIXEL_ID)
         }
       }, 200, request)
+    }
+
+    // ================= PUBLIC CATALOG =================
+    // GET /api/catalog          -> all visible products (live from DB, edited via Admin)
+    // GET /api/catalog/:slug    -> one visible product
+    if ((route === '/catalog' || route.match(/^\/catalog\/[^/]+$/)) && method === 'GET') {
+      await seedCatalogIfEmpty(db)
+      const visible = { status: { $in: ['published', 'out-of-stock'] } }
+      const projection = { _id: 0 }
+      if (route === '/catalog') {
+        const list = await db.collection('products').find(visible, { projection }).sort({ createdAt: 1, _id: 1 }).toArray()
+        return respond({ products: list.map(publicProduct) }, 200, request)
+      }
+      const slug = decodeURIComponent(route.split('/')[2])
+      const p = await db.collection('products').findOne({ ...visible, slug }, { projection })
+      if (!p) return respond({ error: 'Not found' }, 404, request)
+      return respond({ product: publicProduct(p) }, 200, request)
     }
 
     // ================= ORDERS =================
