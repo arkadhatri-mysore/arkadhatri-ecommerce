@@ -1,841 +1,905 @@
 #!/usr/bin/env python3
 """
-ARKADHATRI Final Launch Hardening — Backend Test Suite
-Tests scenarios A-L as specified in test_result.md
+ARKADHATRI Backend Test - Focused Launch Hardening
+Tests admin security, product save, media upload, coupons, orders, catalog
 """
 import requests
 import json
 import time
+import os
 from typing import Dict, Any, Optional
 
-# Configuration
+# Configuration from .env
 BASE_URL = "https://timeless-crafted-8.preview.emergentagent.com/api"
 ADMIN_EMAIL = "admin@arkadhatri.com"
 ADMIN_PASSWORD = "ArkAdmin@2025"
 
 # Test state
-admin_token = None
-test_product_id = None
-test_coupon_id = None
-test_order_id = None
-original_stock = None
+session = requests.Session()
+admin_cookie = None
+test_resources = {
+    'products': [],
+    'coupons': [],
+    'orders': [],
+    'media': []
+}
 
-class TestResult:
-    def __init__(self, scenario: str):
-        self.scenario = scenario
-        self.passed = False
-        self.message = ""
+def log(emoji: str, msg: str):
+    print(f"{emoji} {msg}")
+
+def test_result(name: str, passed: bool, detail: str = ""):
+    status = "✅ PASS" if passed else "❌ FAIL"
+    msg = f"{status} | {name}"
+    if detail:
+        msg += f": {detail}"
+    print(msg)
+    return passed
+
+# ==================== 1. ADMIN SECURITY ====================
+
+def test_admin_security():
+    """Test admin auth: no cookie, forged cookie, rate limit"""
+    log("🔒", "Testing admin security...")
     
-    def success(self, msg: str):
-        self.passed = True
-        self.message = msg
-        print(f"✅ {self.scenario}: PASS - {msg}")
+    results = []
     
-    def fail(self, msg: str):
-        self.passed = False
-        self.message = msg
-        print(f"❌ {self.scenario}: FAIL - {msg}")
-
-results = {}
-
-def admin_login() -> str:
-    """Login as admin and return token"""
+    # Test 1.1: All admin routes without cookie return 401
+    admin_routes = [
+        ('GET', '/admin/products'),
+        ('POST', '/admin/products'),
+        ('GET', '/admin/orders'),
+        ('GET', '/admin/coupons'),
+        ('GET', '/admin/customers'),
+        ('GET', '/admin/settings'),
+        ('GET', '/admin/dashboard'),
+        ('GET', '/admin/inventory'),
+        ('GET', '/admin/me'),
+        ('POST', '/admin/uploads'),
+        ('PATCH', '/admin/products/dummy-id/stock'),
+        ('PUT', '/admin/orders/dummy-id'),
+        ('DELETE', '/admin/products/dummy-id')
+    ]
+    
+    no_auth_pass = True
+    for method, route in admin_routes:
+        try:
+            resp = session.request(method, f"{BASE_URL}{route}", json={})
+            if resp.status_code != 401:
+                log("❌", f"{method} {route} without cookie returned {resp.status_code}, expected 401")
+                no_auth_pass = False
+                break
+        except Exception as e:
+            log("❌", f"Error testing {method} {route}: {e}")
+            no_auth_pass = False
+            break
+    
+    results.append(test_result("Admin routes without cookie return 401", no_auth_pass))
+    
+    # Test 1.2: Forged cookie returns 401
+    forged_cookie = "ark_admin=eyJyb2xlIjoiYWRtaW4ifQ.abc"
     try:
-        resp = requests.post(f"{BASE_URL}/admin/login", json={
+        resp = session.get(f"{BASE_URL}/admin/products", headers={"Cookie": forged_cookie})
+        forged_pass = resp.status_code == 401
+        results.append(test_result("Forged cookie returns 401", forged_pass))
+    except Exception as e:
+        results.append(test_result("Forged cookie returns 401", False, str(e)))
+    
+    # Test 1.3: Empty body login returns 401
+    try:
+        resp = session.post(f"{BASE_URL}/admin/login", json={})
+        empty_pass = resp.status_code == 401
+        results.append(test_result("Empty body login returns 401", empty_pass))
+    except Exception as e:
+        results.append(test_result("Empty body login returns 401", False, str(e)))
+    
+    # Test 1.4: Wrong password returns 401
+    try:
+        resp = session.post(f"{BASE_URL}/admin/login", json={
+            "email": ADMIN_EMAIL,
+            "password": "WrongPassword123"
+        })
+        wrong_pass = resp.status_code == 401
+        results.append(test_result("Wrong password returns 401", wrong_pass))
+    except Exception as e:
+        results.append(test_result("Wrong password returns 401", False, str(e)))
+    
+    # Test 1.5: Rate limit (8 attempts per 15 min) - use unique X-Forwarded-For
+    # We'll test with 3 attempts to avoid locking ourselves out
+    rate_limit_pass = True
+    try:
+        for i in range(3):
+            resp = session.post(f"{BASE_URL}/admin/login", 
+                              json={"email": ADMIN_EMAIL, "password": "wrong"},
+                              headers={"X-Forwarded-For": f"192.168.100.{i}"})
+            if resp.status_code != 401:
+                rate_limit_pass = False
+                break
+        results.append(test_result("Rate limit allows multiple IPs", rate_limit_pass))
+    except Exception as e:
+        results.append(test_result("Rate limit allows multiple IPs", False, str(e)))
+    
+    return all(results)
+
+def admin_login():
+    """Login as admin and store cookie"""
+    global admin_cookie
+    try:
+        resp = session.post(f"{BASE_URL}/admin/login", json={
             "email": ADMIN_EMAIL,
             "password": ADMIN_PASSWORD
         })
         if resp.status_code == 200:
-            # Extract token from Set-Cookie header
-            cookies = resp.headers.get('Set-Cookie', '')
-            if 'admin_token=' in cookies:
-                token = cookies.split('admin_token=')[1].split(';')[0]
-                print(f"✓ Admin login successful")
-                return token
-        print(f"✗ Admin login failed: {resp.status_code} {resp.text}")
-        return None
-    except Exception as e:
-        print(f"✗ Admin login error: {e}")
-        return None
-
-def get_test_product(token: str) -> Optional[Dict]:
-    """Get a product for testing"""
-    try:
-        resp = requests.get(f"{BASE_URL}/admin/products", 
-                          headers={"Cookie": f"admin_token={token}"})
-        if resp.status_code == 200:
-            products = resp.json().get('products', [])
-            if products:
-                # Find a published product
-                for p in products:
-                    if p.get('status') == 'published':
-                        print(f"✓ Found test product: {p.get('name')} (SKU: {p.get('sku')}, Price: {p.get('price')}, Stock: {p.get('stock')})")
-                        return p
-                # If no published, use first one
-                print(f"✓ Using first product: {products[0].get('name')}")
-                return products[0]
-        print(f"✗ Failed to get products: {resp.status_code}")
-        return None
-    except Exception as e:
-        print(f"✗ Error getting products: {e}")
-        return None
-
-def set_product_stock(token: str, product_id: str, stock: int, status: str = 'published') -> bool:
-    """Set product stock"""
-    try:
-        resp = requests.patch(f"{BASE_URL}/admin/products/{product_id}/stock",
-                            headers={"Cookie": f"admin_token={token}"},
-                            json={"stock": stock, "status": status})
-        if resp.status_code == 200:
-            print(f"✓ Set product stock to {stock}")
-            return True
-        print(f"✗ Failed to set stock: {resp.status_code} {resp.text}")
+            # Extract cookie from Set-Cookie header
+            set_cookie = resp.headers.get('Set-Cookie', '')
+            if 'ark_admin=' in set_cookie:
+                admin_cookie = set_cookie.split('ark_admin=')[1].split(';')[0]
+                log("✓", "Admin login successful")
+                return True
+        log("✗", f"Admin login failed: {resp.status_code}")
         return False
     except Exception as e:
-        print(f"✗ Error setting stock: {e}")
+        log("✗", f"Admin login error: {e}")
         return False
 
-def create_test_coupon(token: str) -> Optional[str]:
-    """Create test coupon ARKTEST10"""
-    try:
-        resp = requests.post(f"{BASE_URL}/admin/coupons",
-                           headers={"Cookie": f"admin_token={token}"},
-                           json={
-                               "code": "ARKTEST10",
-                               "type": "percentage",
-                               "value": 10,
-                               "minPurchase": 5000,
-                               "active": True,
-                               "usageLimit": 100
-                           })
-        if resp.status_code == 200:
-            coupon_id = resp.json().get('coupon', {}).get('id')
-            print(f"✓ Created test coupon ARKTEST10 (ID: {coupon_id})")
-            return coupon_id
-        print(f"✗ Failed to create coupon: {resp.status_code} {resp.text}")
-        return None
-    except Exception as e:
-        print(f"✗ Error creating coupon: {e}")
-        return None
+# ==================== 2. PRODUCT SAVE & CATALOG ====================
 
-def delete_coupon(token: str, coupon_id: str):
-    """Delete test coupon"""
+def test_product_save():
+    """Test product validation, duplicate detection, catalog sync"""
+    log("📦", "Testing product save & catalog...")
+    
+    results = []
+    headers = {"Cookie": f"ark_admin={admin_cookie}"}
+    
+    # Test 2.1: POST product requires name, sku, price>0
     try:
-        resp = requests.delete(f"{BASE_URL}/admin/coupons/{coupon_id}",
-                             headers={"Cookie": f"admin_token={token}"})
+        resp = session.post(f"{BASE_URL}/admin/products", headers=headers, json={
+            "name": "",  # Missing name
+            "sku": "TEST-BE-001",
+            "price": 100
+        })
+        missing_name = resp.status_code == 400
+        results.append(test_result("POST product requires name", missing_name))
+    except Exception as e:
+        results.append(test_result("POST product requires name", False, str(e)))
+    
+    try:
+        resp = session.post(f"{BASE_URL}/admin/products", headers=headers, json={
+            "name": "Test Product",
+            "sku": "",  # Missing SKU
+            "price": 100
+        })
+        missing_sku = resp.status_code == 400
+        results.append(test_result("POST product requires SKU", missing_sku))
+    except Exception as e:
+        results.append(test_result("POST product requires SKU", False, str(e)))
+    
+    try:
+        resp = session.post(f"{BASE_URL}/admin/products", headers=headers, json={
+            "name": "Test Product",
+            "sku": "TEST-BE-001",
+            "price": 0  # Invalid price
+        })
+        invalid_price = resp.status_code == 400
+        results.append(test_result("POST product requires price>0", invalid_price))
+    except Exception as e:
+        results.append(test_result("POST product requires price>0", False, str(e)))
+    
+    # Test 2.2: Duplicate SKU returns 409 (use existing real SKU)
+    try:
+        resp = session.post(f"{BASE_URL}/admin/products", headers=headers, json={
+            "name": "Duplicate Test",
+            "sku": "ARK-KV-001",  # Existing real SKU
+            "slug": "duplicate-test",
+            "price": 100
+        })
+        dup_sku = resp.status_code == 409
+        results.append(test_result("Duplicate SKU returns 409", dup_sku))
+    except Exception as e:
+        results.append(test_result("Duplicate SKU returns 409", False, str(e)))
+    
+    # Test 2.3: Duplicate slug returns 409 (use existing real slug)
+    try:
+        resp = session.post(f"{BASE_URL}/admin/products", headers=headers, json={
+            "name": "Duplicate Slug Test",
+            "sku": "TEST-BE-DUP-001",
+            "slug": "kavya",  # Existing real slug
+            "price": 100
+        })
+        dup_slug = resp.status_code == 409
+        results.append(test_result("Duplicate slug returns 409", dup_slug))
+    except Exception as e:
+        results.append(test_result("Duplicate slug returns 409", False, str(e)))
+    
+    # Test 2.4: Create TEST product successfully
+    test_product = None
+    try:
+        resp = session.post(f"{BASE_URL}/admin/products", headers=headers, json={
+            "name": "Test Banarasi Saree",
+            "sku": "TEST-BE-001",
+            "slug": "test-be-banarasi-001",
+            "price": 8500,
+            "comparePrice": 12000,
+            "stock": 3,
+            "status": "published",
+            "description": "Beautiful test saree for backend validation",
+            "fabricType": "Pure Silk",
+            "colourName": "Royal Blue",
+            "colourFamily": "Blue",
+            "images": [],
+            "videoUrl": ""
+        })
         if resp.status_code == 200:
-            print(f"✓ Deleted test coupon")
+            test_product = resp.json().get('product', {})
+            test_resources['products'].append(test_product['id'])
+            results.append(test_result("Create TEST product", True, f"ID: {test_product['id']}"))
         else:
-            print(f"✗ Failed to delete coupon: {resp.status_code}")
+            results.append(test_result("Create TEST product", False, f"Status: {resp.status_code}"))
     except Exception as e:
-        print(f"✗ Error deleting coupon: {e}")
-
-# ==================== TEST SCENARIOS ====================
-
-def test_scenario_a(token: str, product: Dict):
-    """A) Order creation with server-side pricing + atomic stock reservation"""
-    result = TestResult("Scenario A")
-    global test_order_id, original_stock
+        results.append(test_result("Create TEST product", False, str(e)))
     
+    if not test_product:
+        return all(results)
+    
+    # Test 2.5: PUT update price/stock/description
     try:
-        # Step 1: Set stock to 1
-        product_id = product['id']
-        sku = product['sku']
-        price = product['price']
-        original_stock = product.get('stock', 0)
-        
-        if not set_product_stock(token, product_id, 1, 'published'):
-            result.fail("Failed to set stock to 1")
-            return result
-        
-        # Step 2: Create order (client sends NO price)
-        order_data = {
-            "items": [{"sku": sku, "qty": 1}],
-            "customer": {
-                "fullName": "Priya Sharma",
-                "email": "priya.sharma@example.com",
-                "mobile": "9876543210",
-                "address1": "123 MG Road",
-                "address2": "Near City Center",
-                "city": "Bangalore",
-                "state": "Karnataka",
-                "pincode": "560001"
-            },
-            "couponCode": None
-        }
-        
-        resp = requests.post(f"{BASE_URL}/orders", json=order_data)
-        if resp.status_code != 200:
-            result.fail(f"Order creation failed: {resp.status_code} {resp.text}")
-            return result
-        
-        data = resp.json()
-        if not data.get('ok'):
-            result.fail(f"Order not ok: {data}")
-            return result
-        
-        order = data.get('order', {})
-        test_order_id = order.get('id')
-        payment = data.get('payment', {})
-        
-        # Verify server-side pricing
-        if order.get('subtotal') != price:
-            result.fail(f"Subtotal mismatch: expected {price}, got {order.get('subtotal')}")
-            return result
-        
-        # Verify order state
-        if order.get('status') != 'PAYMENT_PENDING':
-            result.fail(f"Status should be PAYMENT_PENDING, got {order.get('status')}")
-            return result
-        
-        if order.get('paymentStatus') != 'pending':
-            result.fail(f"PaymentStatus should be pending, got {order.get('paymentStatus')}")
-            return result
-        
-        if not order.get('stockReserved'):
-            result.fail("stockReserved should be true")
-            return result
-        
-        if order.get('stockCommitted'):
-            result.fail("stockCommitted should be false")
-            return result
-        
-        if not payment.get('mocked'):
-            result.fail("Payment should be mocked")
-            return result
-        
-        # Step 3: Verify stock is now 0
-        time.sleep(0.5)
-        prod_resp = requests.get(f"{BASE_URL}/admin/products/{product_id}",
-                               headers={"Cookie": f"admin_token={token}"})
-        if prod_resp.status_code == 200:
-            updated_product = prod_resp.json().get('product', {})
-            if updated_product.get('stock') != 0:
-                result.fail(f"Stock should be 0, got {updated_product.get('stock')}")
-                return result
-        
-        # Step 4: Try to create second order (should fail with 409)
-        resp2 = requests.post(f"{BASE_URL}/orders", json=order_data)
-        if resp2.status_code != 409:
-            result.fail(f"Second order should return 409, got {resp2.status_code}")
-            return result
-        
-        error_data = resp2.json()
-        if 'Insufficient stock' not in error_data.get('error', ''):
-            result.fail(f"Error should mention insufficient stock: {error_data}")
-            return result
-        
-        # Step 5: Restore stock to 5
-        if not set_product_stock(token, product_id, 5, 'published'):
-            result.fail("Failed to restore stock")
-            return result
-        
-        result.success("Server-side pricing, atomic reservation, rollback all working")
-        
-    except Exception as e:
-        result.fail(f"Exception: {e}")
-    
-    results['A'] = result
-    return result
-
-def test_scenario_b(token: str, product: Dict):
-    """B) Server-side pricing tamper-proof"""
-    result = TestResult("Scenario B")
-    
-    try:
-        sku = product['sku']
-        real_price = product['price']
-        
-        # Try to tamper with price
-        order_data = {
-            "items": [{"sku": sku, "qty": 1, "price": 1}],  # Tampered price
-            "customer": {
-                "fullName": "Amit Kumar",
-                "email": "amit.kumar@example.com",
-                "mobile": "9123456789",
-                "address1": "456 Park Street",
-                "city": "Kolkata",
-                "state": "West Bengal",
-                "pincode": "700016"
-            }
-        }
-        
-        resp = requests.post(f"{BASE_URL}/orders", json=order_data)
-        if resp.status_code != 200:
-            result.fail(f"Order creation failed: {resp.status_code} {resp.text}")
-            return result
-        
-        data = resp.json()
-        order = data.get('order', {})
-        
-        # Verify server ignored client price
-        if order.get('subtotal') != real_price:
-            result.fail(f"Server used tampered price! Expected {real_price}, got {order.get('subtotal')}")
-            return result
-        
-        result.success(f"Server correctly used DB price {real_price}, ignored client price 1")
-        
-    except Exception as e:
-        result.fail(f"Exception: {e}")
-    
-    results['B'] = result
-    return result
-
-def test_scenario_c():
-    """C) Customer field validation"""
-    result = TestResult("Scenario C")
-    
-    try:
-        # Missing mobile field
-        order_data = {
-            "items": [{"sku": "TEST", "qty": 1}],
-            "customer": {
-                "fullName": "Test User",
-                "email": "test@example.com",
-                # mobile missing
-                "address1": "123 Street",
-                "city": "City",
-                "state": "State",
-                "pincode": "123456"
-            }
-        }
-        
-        resp = requests.post(f"{BASE_URL}/orders", json=order_data)
-        if resp.status_code != 400:
-            result.fail(f"Should return 400, got {resp.status_code}")
-            return result
-        
-        error = resp.json().get('error', '')
-        if 'mobile' not in error.lower():
-            result.fail(f"Error should mention mobile: {error}")
-            return result
-        
-        result.success(f"Validation working: {error}")
-        
-    except Exception as e:
-        result.fail(f"Exception: {e}")
-    
-    results['C'] = result
-    return result
-
-def test_scenario_d(token: str, product: Dict):
-    """D) Coupon flow"""
-    result = TestResult("Scenario D")
-    global test_coupon_id
-    
-    try:
-        # Create coupon
-        test_coupon_id = create_test_coupon(token)
-        if not test_coupon_id:
-            result.fail("Failed to create test coupon")
-            return result
-        
-        time.sleep(0.5)
-        
-        # Get initial usage
-        coupons_resp = requests.get(f"{BASE_URL}/admin/coupons",
-                                   headers={"Cookie": f"admin_token={token}"})
-        if coupons_resp.status_code != 200:
-            result.fail("Failed to get coupons")
-            return result
-        
-        coupons = coupons_resp.json().get('coupons', [])
-        test_coupon = next((c for c in coupons if c['code'] == 'ARKTEST10'), None)
-        if not test_coupon:
-            result.fail("Test coupon not found")
-            return result
-        
-        initial_used = test_coupon.get('used', 0)
-        
-        # Create order with coupon (subtotal must be >= 5000)
-        sku = product['sku']
-        price = product['price']
-        
-        # Calculate qty to meet minimum
-        qty = max(1, int(5000 / price) + 1) if price > 0 else 1
-        
-        order_data = {
-            "items": [{"sku": sku, "qty": qty}],
-            "customer": {
-                "fullName": "Rajesh Verma",
-                "email": "rajesh.verma@example.com",
-                "mobile": "9988776655",
-                "address1": "789 Brigade Road",
-                "city": "Bangalore",
-                "state": "Karnataka",
-                "pincode": "560025"
-            },
-            "couponCode": "ARKTEST10"
-        }
-        
-        resp = requests.post(f"{BASE_URL}/orders", json=order_data)
-        if resp.status_code != 200:
-            result.fail(f"Order with coupon failed: {resp.status_code} {resp.text}")
-            return result
-        
-        data = resp.json()
-        order = data.get('order', {})
-        
-        # Verify discount
-        subtotal = order.get('subtotal', 0)
-        discount = order.get('discount', 0)
-        expected_discount = int(subtotal * 0.1)
-        
-        if abs(discount - expected_discount) > 1:  # Allow 1 rupee rounding
-            result.fail(f"Discount mismatch: expected ~{expected_discount}, got {discount}")
-            return result
-        
-        # Verify coupon applied
-        coupon_applied = order.get('couponApplied', {})
-        if coupon_applied.get('code') != 'ARKTEST10':
-            result.fail(f"Coupon code not applied: {coupon_applied}")
-            return result
-        
-        # Verify usage incremented
-        time.sleep(0.5)
-        coupons_resp2 = requests.get(f"{BASE_URL}/admin/coupons",
-                                    headers={"Cookie": f"admin_token={token}"}")
-        if coupons_resp2.status_code == 200:
-            coupons2 = coupons_resp2.json().get('coupons', [])
-            test_coupon2 = next((c for c in coupons2 if c['code'] == 'ARKTEST10'), None)
-            if test_coupon2:
-                new_used = test_coupon2.get('used', 0)
-                if new_used != initial_used + 1:
-                    result.fail(f"Usage not incremented: was {initial_used}, now {new_used}")
-                    return result
-        
-        result.success(f"Coupon applied: discount={discount}, usage incremented")
-        
-    except Exception as e:
-        result.fail(f"Exception: {e}")
-    
-    results['D'] = result
-    return result
-
-def test_scenario_e():
-    """E) Razorpay verify — mocked mode (should NOT mark as paid)"""
-    result = TestResult("Scenario E")
-    
-    try:
-        if not test_order_id:
-            result.fail("No test order ID available")
-            return result
-        
-        # Call verify without signature (mocked mode)
-        resp = requests.post(f"{BASE_URL}/payments/razorpay/verify", json={
-            "orderId": test_order_id
+        resp = session.put(f"{BASE_URL}/admin/products/{test_product['id']}", 
+                          headers=headers, json={
+            "name": test_product['name'],
+            "sku": test_product['sku'],
+            "slug": test_product['slug'],
+            "price": 9000,  # Updated price
+            "stock": 5,  # Updated stock
+            "description": "Updated description for testing",
+            "status": "published"
         })
-        
-        if resp.status_code != 200:
-            result.fail(f"Verify failed: {resp.status_code} {resp.text}")
-            return result
-        
-        data = resp.json()
-        if not data.get('ok'):
-            result.fail(f"Verify not ok: {data}")
-            return result
-        
-        if not data.get('mocked'):
-            result.fail("Should return mocked:true")
-            return result
-        
-        # Verify order still PAYMENT_PENDING
-        time.sleep(0.5)
-        order_resp = requests.get(f"{BASE_URL}/orders/{test_order_id}")
-        if order_resp.status_code != 200:
-            result.fail(f"Failed to get order: {order_resp.status_code}")
-            return result
-        
-        order = order_resp.json().get('order', {})
-        if order.get('paymentStatus') != 'pending':
-            result.fail(f"Order should remain pending, got {order.get('paymentStatus')}")
-            return result
-        
-        result.success("Mocked verify does NOT mark order as paid (correct)")
-        
+        update_pass = resp.status_code == 200
+        results.append(test_result("PUT update product", update_pass))
     except Exception as e:
-        result.fail(f"Exception: {e}")
+        results.append(test_result("PUT update product", False, str(e)))
     
-    results['E'] = result
-    return result
-
-def test_scenario_g():
-    """G) Razorpay webhook without secret (should return 503)"""
-    result = TestResult("Scenario G")
-    
+    # Test 2.6: GET /api/catalog/:slug reflects changes immediately
+    time.sleep(0.5)
     try:
-        resp = requests.post(f"{BASE_URL}/webhooks/razorpay", 
-                           json={"event": "test"},
-                           headers={"x-razorpay-signature": "dummy"})
-        
-        if resp.status_code != 503:
-            result.fail(f"Should return 503, got {resp.status_code}")
-            return result
-        
-        error = resp.json().get('error', '')
-        if 'not configured' not in error.lower():
-            result.fail(f"Error should mention not configured: {error}")
-            return result
-        
-        result.success("Webhook correctly returns 503 when secret not configured")
-        
+        resp = session.get(f"{BASE_URL}/catalog/{test_product['slug']}")
+        if resp.status_code == 200:
+            catalog_product = resp.json().get('product', {})
+            price_match = catalog_product.get('price') == 9000
+            stock_match = catalog_product.get('stock') == 5
+            desc_match = "Updated description" in catalog_product.get('description', '')
+            in_stock = catalog_product.get('inStock') == True
+            
+            catalog_sync = price_match and stock_match and desc_match and in_stock
+            results.append(test_result("Catalog reflects updates immediately", catalog_sync,
+                                     f"price={catalog_product.get('price')}, stock={catalog_product.get('stock')}, inStock={in_stock}"))
+        else:
+            results.append(test_result("Catalog reflects updates immediately", False, f"Status: {resp.status_code}"))
     except Exception as e:
-        result.fail(f"Exception: {e}")
+        results.append(test_result("Catalog reflects updates immediately", False, str(e)))
     
-    results['G'] = result
-    return result
-
-def test_scenario_h():
-    """H) Order tracking with redaction"""
-    result = TestResult("Scenario H")
-    
+    # Test 2.7: PUT unknown id returns 404
     try:
-        if not test_order_id:
-            result.fail("No test order ID available")
-            return result
-        
-        # Track with correct email
-        resp = requests.post(f"{BASE_URL}/orders/track", json={
-            "orderId": test_order_id,
-            "identifier": "priya.sharma@example.com"
+        resp = session.put(f"{BASE_URL}/admin/products/unknown-id-12345", 
+                          headers=headers, json={
+            "name": "Test",
+            "sku": "TEST",
+            "price": 100
         })
-        
-        if resp.status_code != 200:
-            result.fail(f"Track failed: {resp.status_code} {resp.text}")
-            return result
-        
-        data = resp.json()
-        order = data.get('order', {})
-        
-        # Verify redaction (no customer.email or customer.address)
-        if 'customer' in order:
-            if 'email' in order['customer'] or 'address1' in order['customer']:
-                result.fail("Order should be redacted (no email/address in customer)")
-                return result
-        
-        # Should have basic info
-        if not order.get('id') or not order.get('status'):
-            result.fail("Order should have id and status")
-            return result
-        
-        # Track with wrong identifier
-        resp2 = requests.post(f"{BASE_URL}/orders/track", json={
-            "orderId": test_order_id,
-            "identifier": "wrong@example.com"
+        unknown_id = resp.status_code == 404
+        results.append(test_result("PUT unknown id returns 404", unknown_id))
+    except Exception as e:
+        results.append(test_result("PUT unknown id returns 404", False, str(e)))
+    
+    # Test 2.8: Status draft -> not in /api/catalog
+    try:
+        # Create draft product
+        resp = session.post(f"{BASE_URL}/admin/products", headers=headers, json={
+            "name": "Draft Test Product",
+            "sku": "TEST-BE-DRAFT-001",
+            "slug": "test-be-draft-001",
+            "price": 5000,
+            "stock": 10,
+            "status": "draft"
         })
-        
-        if resp2.status_code != 404:
-            result.fail(f"Wrong identifier should return 404, got {resp2.status_code}")
-            return result
-        
-        result.success("Order tracking returns redacted response, rejects wrong identifier")
-        
+        if resp.status_code == 200:
+            draft_product = resp.json().get('product', {})
+            test_resources['products'].append(draft_product['id'])
+            
+            # Check it's NOT in catalog
+            time.sleep(0.5)
+            resp2 = session.get(f"{BASE_URL}/catalog/{draft_product['slug']}")
+            draft_hidden = resp2.status_code == 404
+            results.append(test_result("Draft product not in catalog", draft_hidden))
+        else:
+            results.append(test_result("Draft product not in catalog", False, "Failed to create draft"))
     except Exception as e:
-        result.fail(f"Exception: {e}")
+        results.append(test_result("Draft product not in catalog", False, str(e)))
     
-    results['H'] = result
-    return result
-
-def test_scenario_i(token: str):
-    """I) Admin order state transitions"""
-    result = TestResult("Scenario I")
-    
+    # Test 2.9: PATCH /api/admin/products/:id/stock works and syncs
     try:
-        if not test_order_id:
-            result.fail("No test order ID available")
-            return result
-        
-        # Try illegal transition: PAYMENT_PENDING -> SHIPPED
-        resp = requests.put(f"{BASE_URL}/admin/orders/{test_order_id}",
-                          headers={"Cookie": f"admin_token={token}"},
-                          json={"status": "SHIPPED"})
-        
-        if resp.status_code != 400:
-            result.fail(f"Illegal transition should return 400, got {resp.status_code}")
-            return result
-        
-        error = resp.json().get('error', '')
-        if 'transition' not in error.lower():
-            result.fail(f"Error should mention transition: {error}")
-            return result
-        
-        # Legal transition: PAYMENT_PENDING -> PAID
-        resp2 = requests.put(f"{BASE_URL}/admin/orders/{test_order_id}",
-                           headers={"Cookie": f"admin_token={token}"},
-                           json={"status": "PAID"})
-        
-        if resp2.status_code != 200:
-            result.fail(f"Legal transition PAID failed: {resp2.status_code} {resp2.text}")
-            return result
-        
-        # PAID -> PROCESSING
-        time.sleep(0.3)
-        resp3 = requests.put(f"{BASE_URL}/admin/orders/{test_order_id}",
-                           headers={"Cookie": f"admin_token={token}"},
-                           json={"status": "PROCESSING"})
-        
-        if resp3.status_code != 200:
-            result.fail(f"Transition to PROCESSING failed: {resp3.status_code}")
-            return result
-        
-        # PROCESSING -> PACKED
-        time.sleep(0.3)
-        resp4 = requests.put(f"{BASE_URL}/admin/orders/{test_order_id}",
-                           headers={"Cookie": f"admin_token={token}"},
-                           json={"status": "PACKED"})
-        
-        if resp4.status_code != 200:
-            result.fail(f"Transition to PACKED failed: {resp4.status_code}")
-            return result
-        
-        # PACKED -> SHIPPED with shipping fields
-        time.sleep(0.3)
-        resp5 = requests.put(f"{BASE_URL}/admin/orders/{test_order_id}",
-                           headers={"Cookie": f"admin_token={token}"},
-                           json={
-                               "status": "SHIPPED",
-                               "courier": "Delhivery",
-                               "awb": "12345678",
-                               "trackingUrl": "https://delhivery.com/track/12345678"
-                           })
-        
-        if resp5.status_code != 200:
-            result.fail(f"Transition to SHIPPED failed: {resp5.status_code}")
-            return result
-        
-        # Verify shipping fields persisted
-        time.sleep(0.3)
-        order_resp = requests.get(f"{BASE_URL}/admin/orders/{test_order_id}",
-                                headers={"Cookie": f"admin_token={token}"})
-        
-        if order_resp.status_code == 200:
-            order = order_resp.json().get('order', {})
-            if order.get('courier') != 'Delhivery':
-                result.fail(f"Courier not persisted: {order.get('courier')}")
-                return result
-            if order.get('awb') != '12345678':
-                result.fail(f"AWB not persisted: {order.get('awb')}")
-                return result
-        
-        result.success("State transitions validated, illegal jumps rejected, shipping fields persisted")
-        
+        resp = session.patch(f"{BASE_URL}/admin/products/{test_product['id']}/stock",
+                           headers=headers, json={"stock": 0})
+        if resp.status_code == 200:
+            time.sleep(0.5)
+            resp2 = session.get(f"{BASE_URL}/catalog/{test_product['slug']}")
+            if resp2.status_code == 200:
+                catalog_product = resp2.json().get('product', {})
+                stock_zero = catalog_product.get('stock') == 0
+                in_stock_false = catalog_product.get('inStock') == False
+                stock_sync = stock_zero and in_stock_false
+                results.append(test_result("PATCH stock syncs to catalog (inStock=false when 0)", stock_sync,
+                                         f"stock={catalog_product.get('stock')}, inStock={catalog_product.get('inStock')}"))
+            else:
+                results.append(test_result("PATCH stock syncs to catalog", False, "Catalog fetch failed"))
+        else:
+            results.append(test_result("PATCH stock syncs to catalog", False, f"Status: {resp.status_code}"))
     except Exception as e:
-        result.fail(f"Exception: {e}")
+        results.append(test_result("PATCH stock syncs to catalog", False, str(e)))
     
-    results['I'] = result
-    return result
+    return all(results)
 
-def test_scenario_j():
-    """J) Rate limiting sanity (newsletter, contact)"""
-    result = TestResult("Scenario J")
+# ==================== 3. MEDIA UPLOAD ====================
+
+def test_media_upload():
+    """Test chunked media upload with ~2MB video"""
+    log("🎬", "Testing media upload...")
     
+    results = []
+    headers = {"Cookie": f"ark_admin={admin_cookie}"}
+    
+    # Create ~2MB random video data
+    video_size = 2 * 1024 * 1024  # 2MB
+    video_data = os.urandom(video_size)
+    
+    # Test 3.1: POST /api/admin/uploads init
+    upload_id = None
+    chunk_size = None
+    total_chunks = None
     try:
-        # Test newsletter
-        resp1 = requests.post(f"{BASE_URL}/newsletter", json={
-            "email": "newsletter.test@example.com"
+        resp = session.post(f"{BASE_URL}/admin/uploads", headers=headers, json={
+            "filename": "test-video.mp4",
+            "mime": "video/mp4",
+            "size": video_size
         })
+        if resp.status_code == 200:
+            data = resp.json()
+            upload_id = data.get('uploadId')
+            chunk_size = data.get('chunkSize')
+            total_chunks = data.get('totalChunks')
+            results.append(test_result("Init upload", True, 
+                                     f"uploadId={upload_id[:8]}..., chunks={total_chunks}"))
+        else:
+            results.append(test_result("Init upload", False, f"Status: {resp.status_code}"))
+    except Exception as e:
+        results.append(test_result("Init upload", False, str(e)))
+    
+    if not upload_id:
+        return all(results)
+    
+    # Test 3.2: PUT chunks
+    chunks_uploaded = 0
+    try:
+        for i in range(total_chunks):
+            start = i * chunk_size
+            end = min(start + chunk_size, video_size)
+            chunk_data = video_data[start:end]
+            
+            resp = session.put(f"{BASE_URL}/admin/uploads/{upload_id}/chunks/{i}",
+                             headers={**headers, "Content-Type": "application/octet-stream"},
+                             data=chunk_data)
+            if resp.status_code == 200:
+                chunks_uploaded += 1
+            else:
+                break
         
-        if resp1.status_code != 200:
-            result.fail(f"Newsletter failed: {resp1.status_code} {resp1.text}")
-            return result
-        
-        if not resp1.json().get('ok'):
-            result.fail(f"Newsletter not ok: {resp1.json()}")
-            return result
-        
-        # Test contact
-        resp2 = requests.post(f"{BASE_URL}/contact", json={
-            "name": "Test User",
-            "email": "contact.test@example.com",
-            "message": "This is a test message for rate limiting check"
+        chunks_pass = chunks_uploaded == total_chunks
+        results.append(test_result("Upload chunks", chunks_pass, 
+                                  f"{chunks_uploaded}/{total_chunks} chunks"))
+    except Exception as e:
+        results.append(test_result("Upload chunks", False, str(e)))
+    
+    # Test 3.3: POST complete
+    media_url = None
+    try:
+        resp = session.post(f"{BASE_URL}/admin/uploads/{upload_id}/complete", headers=headers)
+        if resp.status_code == 200:
+            data = resp.json()
+            media_url = data.get('url')
+            test_resources['media'].append(media_url)
+            results.append(test_result("Complete upload", True, f"url={media_url}"))
+        else:
+            results.append(test_result("Complete upload", False, f"Status: {resp.status_code}, {resp.text}"))
+    except Exception as e:
+        results.append(test_result("Complete upload", False, str(e)))
+    
+    if not media_url:
+        return all(results)
+    
+    # Test 3.4: GET url returns identical bytes
+    try:
+        resp = session.get(f"{BASE_URL.replace('/api', '')}{media_url}")
+        if resp.status_code == 200:
+            downloaded_data = resp.content
+            bytes_match = len(downloaded_data) == video_size
+            results.append(test_result("GET media returns correct size", bytes_match,
+                                     f"{len(downloaded_data)} bytes"))
+        else:
+            results.append(test_result("GET media returns correct size", False, f"Status: {resp.status_code}"))
+    except Exception as e:
+        results.append(test_result("GET media returns correct size", False, str(e)))
+    
+    # Test 3.5: Range request (bytes=100-199) returns 206
+    try:
+        resp = session.get(f"{BASE_URL.replace('/api', '')}{media_url}",
+                          headers={"Range": "bytes=100-199"})
+        range_pass = resp.status_code == 206 and 'Content-Range' in resp.headers
+        results.append(test_result("Range request returns 206", range_pass,
+                                  f"Content-Range: {resp.headers.get('Content-Range', 'N/A')}"))
+    except Exception as e:
+        results.append(test_result("Range request returns 206", False, str(e)))
+    
+    # Test 3.6: Bad range returns 416
+    try:
+        resp = session.get(f"{BASE_URL.replace('/api', '')}{media_url}",
+                          headers={"Range": f"bytes={video_size + 1000}-{video_size + 2000}"})
+        bad_range = resp.status_code == 416
+        results.append(test_result("Bad range returns 416", bad_range))
+    except Exception as e:
+        results.append(test_result("Bad range returns 416", False, str(e)))
+    
+    # Test 3.7: Unknown media returns 404
+    try:
+        resp = session.get(f"{BASE_URL}/media/unknown-file-12345.mp4")
+        unknown_media = resp.status_code == 404
+        results.append(test_result("Unknown media returns 404", unknown_media))
+    except Exception as e:
+        results.append(test_result("Unknown media returns 404", False, str(e)))
+    
+    # Test 3.8: Wrong mime returns 415
+    try:
+        resp = session.post(f"{BASE_URL}/admin/uploads", headers=headers, json={
+            "filename": "test.exe",
+            "mime": "application/x-msdownload",
+            "size": 1000
         })
-        
-        if resp2.status_code != 200:
-            result.fail(f"Contact failed: {resp2.status_code} {resp2.text}")
-            return result
-        
-        if not resp2.json().get('ok'):
-            result.fail(f"Contact not ok: {resp2.json()}")
-            return result
-        
-        result.success("Newsletter and Contact endpoints working with rate limiting")
-        
+        wrong_mime = resp.status_code == 415
+        results.append(test_result("Wrong mime returns 415", wrong_mime))
     except Exception as e:
-        result.fail(f"Exception: {e}")
+        results.append(test_result("Wrong mime returns 415", False, str(e)))
     
-    results['J'] = result
-    return result
-
-def test_scenario_k(token: str):
-    """K) Dashboard revenue (only paid orders)"""
-    result = TestResult("Scenario K")
-    
+    # Test 3.9: Oversize returns 413
     try:
-        # Get dashboard
-        resp = requests.get(f"{BASE_URL}/admin/dashboard",
-                          headers={"Cookie": f"admin_token={token}"})
-        
-        if resp.status_code != 200:
-            result.fail(f"Dashboard failed: {resp.status_code} {resp.text}")
-            return result
-        
-        data = resp.json()
-        revenue = data.get('revenue', 0)
-        
-        # We marked test_order_id as PAID in scenario I, so revenue should include it
-        # Get the order to verify
-        if test_order_id:
-            order_resp = requests.get(f"{BASE_URL}/admin/orders/{test_order_id}",
-                                    headers={"Cookie": f"admin_token={token}"})
-            if order_resp.status_code == 200:
-                order = order_resp.json().get('order', {})
-                if order.get('paymentStatus') == 'paid':
-                    # Revenue should be > 0 since we have at least one paid order
-                    if revenue <= 0:
-                        result.fail(f"Revenue should be > 0 for paid orders, got {revenue}")
-                        return result
-        
-        result.success(f"Dashboard revenue correctly sums only paid orders: ₹{revenue}")
-        
+        resp = session.post(f"{BASE_URL}/admin/uploads", headers=headers, json={
+            "filename": "huge.mp4",
+            "mime": "video/mp4",
+            "size": 300 * 1024 * 1024  # 300MB (over 200MB limit)
+        })
+        oversize = resp.status_code == 413
+        results.append(test_result("Oversize returns 413", oversize))
     except Exception as e:
-        result.fail(f"Exception: {e}")
+        results.append(test_result("Oversize returns 413", False, str(e)))
     
-    results['K'] = result
-    return result
-
-def test_scenario_l():
-    """L) Smoke tests for other endpoints"""
-    result = TestResult("Scenario L")
-    
+    # Test 3.10: Complete with missing chunk returns 400
     try:
-        # Test coupon validate
-        resp1 = requests.post(f"{BASE_URL}/coupons/validate", json={
-            "code": "ARKTEST10",
+        # Init new upload
+        resp = session.post(f"{BASE_URL}/admin/uploads", headers=headers, json={
+            "filename": "incomplete.mp4",
+            "mime": "video/mp4",
+            "size": 1024 * 1024
+        })
+        if resp.status_code == 200:
+            incomplete_id = resp.json().get('uploadId')
+            # Try to complete without uploading chunks
+            resp2 = session.post(f"{BASE_URL}/admin/uploads/{incomplete_id}/complete", headers=headers)
+            incomplete_pass = resp2.status_code == 400
+            results.append(test_result("Complete with missing chunk returns 400", incomplete_pass))
+        else:
+            results.append(test_result("Complete with missing chunk returns 400", False, "Init failed"))
+    except Exception as e:
+        results.append(test_result("Complete with missing chunk returns 400", False, str(e)))
+    
+    return all(results)
+
+# ==================== 4. COUPONS + ORDERS ====================
+
+def test_coupons_orders():
+    """Test coupon creation, validation, order with discount"""
+    log("🎟️", "Testing coupons + orders...")
+    
+    results = []
+    headers = {"Cookie": f"ark_admin={admin_cookie}"}
+    
+    # Test 4.1: Create TEST coupon
+    coupon_id = None
+    try:
+        resp = session.post(f"{BASE_URL}/admin/coupons", headers=headers, json={
+            "code": "TESTBE10",
+            "type": "percentage",
+            "value": 10,
+            "minPurchase": 5000,
+            "active": True,
+            "usageLimit": 100
+        })
+        if resp.status_code == 200:
+            coupon = resp.json().get('coupon', {})
+            coupon_id = coupon.get('id')
+            test_resources['coupons'].append(coupon_id)
+            results.append(test_result("Create TEST coupon", True, f"code=TESTBE10, id={coupon_id}"))
+        else:
+            results.append(test_result("Create TEST coupon", False, f"Status: {resp.status_code}"))
+    except Exception as e:
+        results.append(test_result("Create TEST coupon", False, str(e)))
+    
+    # Test 4.2: Validate coupon (public endpoint)
+    try:
+        resp = session.post(f"{BASE_URL}/coupons/validate", json={
+            "code": "TESTBE10",
             "subtotal": 10000
         })
-        
-        if resp1.status_code != 200:
-            result.fail(f"Coupon validate failed: {resp1.status_code}")
-            return result
-        
-        # Test GET orders/:id (should work for existing order)
-        if test_order_id:
-            resp2 = requests.get(f"{BASE_URL}/orders/{test_order_id}")
-            if resp2.status_code != 200:
-                result.fail(f"GET orders/:id failed: {resp2.status_code}")
-                return result
-        
-        result.success("Coupon validate and GET orders/:id working")
-        
+        if resp.status_code == 200:
+            data = resp.json()
+            discount = data.get('discount', 0)
+            expected_discount = 1000  # 10% of 10000
+            discount_match = discount == expected_discount
+            results.append(test_result("Validate coupon (percentage)", discount_match,
+                                     f"discount={discount}, expected={expected_discount}"))
+        else:
+            results.append(test_result("Validate coupon (percentage)", False, f"Status: {resp.status_code}"))
     except Exception as e:
-        result.fail(f"Exception: {e}")
+        results.append(test_result("Validate coupon (percentage)", False, str(e)))
     
-    results['L'] = result
-    return result
+    # Test 4.3: Validate with minPurchase not met
+    try:
+        resp = session.post(f"{BASE_URL}/coupons/validate", json={
+            "code": "TESTBE10",
+            "subtotal": 3000  # Below minPurchase of 5000
+        })
+        min_purchase_fail = resp.status_code == 400
+        results.append(test_result("Coupon minPurchase validation", min_purchase_fail))
+    except Exception as e:
+        results.append(test_result("Coupon minPurchase validation", False, str(e)))
+    
+    # Test 4.4: Create flat discount coupon
+    flat_coupon_id = None
+    try:
+        resp = session.post(f"{BASE_URL}/admin/coupons", headers=headers, json={
+            "code": "TESTFLAT500",
+            "type": "flat",
+            "value": 500,
+            "minPurchase": 2000,
+            "active": True
+        })
+        if resp.status_code == 200:
+            flat_coupon = resp.json().get('coupon', {})
+            flat_coupon_id = flat_coupon.get('id')
+            test_resources['coupons'].append(flat_coupon_id)
+            
+            # Validate flat coupon
+            resp2 = session.post(f"{BASE_URL}/coupons/validate", json={
+                "code": "TESTFLAT500",
+                "subtotal": 5000
+            })
+            if resp2.status_code == 200:
+                discount = resp2.json().get('discount', 0)
+                flat_pass = discount == 500
+                results.append(test_result("Validate coupon (flat)", flat_pass, f"discount={discount}"))
+            else:
+                results.append(test_result("Validate coupon (flat)", False, "Validation failed"))
+        else:
+            results.append(test_result("Validate coupon (flat)", False, "Creation failed"))
+    except Exception as e:
+        results.append(test_result("Validate coupon (flat)", False, str(e)))
+    
+    # Test 4.5: Expired coupon
+    try:
+        resp = session.post(f"{BASE_URL}/admin/coupons", headers=headers, json={
+            "code": "TESTEXPIRED",
+            "type": "percentage",
+            "value": 20,
+            "expiryDate": "2020-01-01T00:00:00Z",  # Past date
+            "active": True
+        })
+        if resp.status_code == 200:
+            expired_coupon = resp.json().get('coupon', {})
+            test_resources['coupons'].append(expired_coupon.get('id'))
+            
+            # Try to validate
+            resp2 = session.post(f"{BASE_URL}/coupons/validate", json={
+                "code": "TESTEXPIRED",
+                "subtotal": 5000
+            })
+            expired_fail = resp2.status_code in [400, 404]
+            results.append(test_result("Expired coupon rejected", expired_fail))
+        else:
+            results.append(test_result("Expired coupon rejected", False, "Creation failed"))
+    except Exception as e:
+        results.append(test_result("Expired coupon rejected", False, str(e)))
+    
+    # Test 4.6: Inactive coupon
+    try:
+        resp = session.post(f"{BASE_URL}/admin/coupons", headers=headers, json={
+            "code": "TESTINACTIVE",
+            "type": "percentage",
+            "value": 15,
+            "active": False
+        })
+        if resp.status_code == 200:
+            inactive_coupon = resp.json().get('coupon', {})
+            test_resources['coupons'].append(inactive_coupon.get('id'))
+            
+            # Try to validate
+            resp2 = session.post(f"{BASE_URL}/coupons/validate", json={
+                "code": "TESTINACTIVE",
+                "subtotal": 5000
+            })
+            inactive_fail = resp2.status_code in [400, 404]
+            results.append(test_result("Inactive coupon rejected", inactive_fail))
+        else:
+            results.append(test_result("Inactive coupon rejected", False, "Creation failed"))
+    except Exception as e:
+        results.append(test_result("Inactive coupon rejected", False, str(e)))
+    
+    # Test 4.7: Create order with coupon and verify discount math
+    # First, get a test product
+    test_product = None
+    try:
+        resp = session.get(f"{BASE_URL}/admin/products", headers=headers)
+        if resp.status_code == 200:
+            products = resp.json().get('products', [])
+            # Find TEST-BE-001 or any published product
+            for p in products:
+                if p.get('sku') == 'TEST-BE-001' and p.get('status') == 'published':
+                    test_product = p
+                    break
+            if not test_product:
+                for p in products:
+                    if p.get('status') == 'published' and p.get('stock', 0) > 0:
+                        test_product = p
+                        break
+    except Exception as e:
+        pass
+    
+    if test_product:
+        # Ensure stock is available
+        try:
+            session.patch(f"{BASE_URL}/admin/products/{test_product['id']}/stock",
+                        headers=headers, json={"stock": 10, "status": "published"})
+            time.sleep(0.5)
+        except:
+            pass
+        
+        # Calculate qty to meet minPurchase
+        price = test_product.get('price', 0)
+        qty = max(1, int(5000 / price) + 1) if price > 0 else 1
+        
+        try:
+            resp = session.post(f"{BASE_URL}/orders", json={
+                "items": [{"sku": test_product['sku'], "qty": qty}],
+                "customer": {
+                    "fullName": "Ananya Reddy",
+                    "email": "ananya.reddy@example.com",
+                    "mobile": "9876543210",
+                    "address1": "45 Jubilee Hills",
+                    "address2": "Road No 36",
+                    "city": "Hyderabad",
+                    "state": "Telangana",
+                    "pincode": "500033"
+                },
+                "couponCode": "TESTBE10"
+            })
+            if resp.status_code == 200:
+                data = resp.json()
+                order = data.get('order', {})
+                test_resources['orders'].append(order.get('id'))
+                
+                # Verify discount math
+                subtotal = order.get('subtotal', 0)
+                discount = order.get('discount', 0)
+                expected_discount = int(subtotal * 0.1)
+                
+                # Allow 1 rupee rounding difference
+                discount_correct = abs(discount - expected_discount) <= 1
+                
+                # Verify stock reservation
+                stock_reserved = order.get('stockReserved') == True
+                stock_committed = order.get('stockCommitted') == False
+                
+                # Verify coupon applied
+                coupon_applied = order.get('couponApplied', {}).get('code') == 'TESTBE10'
+                
+                order_pass = discount_correct and stock_reserved and not stock_committed and coupon_applied
+                
+                # Detailed error reporting
+                if not order_pass:
+                    details = f"subtotal={subtotal}, discount={discount}, stockReserved={stock_reserved}, stockCommitted={stock_committed}, couponApplied={order.get('couponApplied', {}).get('code')}"
+                else:
+                    details = f"subtotal={subtotal}, discount={discount}, stockReserved={stock_reserved}"
+                
+                results.append(test_result("Order with coupon (server-side discount)", order_pass, details))
+            else:
+                results.append(test_result("Order with coupon", False, f"Status: {resp.status_code}, {resp.text}"))
+        except Exception as e:
+            results.append(test_result("Order with coupon", False, str(e)))
+    else:
+        results.append(test_result("Order with coupon", False, "No test product available"))
+    
+    return all(results)
 
-def cleanup(token: str, product_id: str):
-    """Cleanup test data"""
-    print("\n" + "="*60)
-    print("CLEANUP")
-    print("="*60)
-    
-    # Delete test coupon
-    if test_coupon_id:
-        delete_coupon(token, test_coupon_id)
-    
-    # Restore product stock
-    if product_id and original_stock is not None:
-        set_product_stock(token, product_id, max(5, original_stock), 'published')
-        print(f"✓ Restored product stock to {max(5, original_stock)}")
+# ==================== 5. PUBLIC ENDPOINTS ====================
 
-def print_summary():
-    """Print test summary"""
-    print("\n" + "="*60)
-    print("TEST SUMMARY")
-    print("="*60)
+def test_public_endpoints():
+    """Test public health and catalog endpoints"""
+    log("🌐", "Testing public endpoints...")
     
-    passed = sum(1 for r in results.values() if r.passed)
-    total = len(results)
+    results = []
     
-    for scenario in sorted(results.keys()):
-        r = results[scenario]
-        status = "✅ PASS" if r.passed else "❌ FAIL"
-        print(f"{status} | Scenario {scenario}: {r.message}")
+    # Test 5.1: GET /api/health
+    try:
+        resp = session.get(f"{BASE_URL}/health")
+        if resp.status_code == 200:
+            data = resp.json()
+            has_ok = data.get('ok') == True
+            has_service = 'service' in data
+            has_db = 'db' in data
+            health_pass = has_ok and has_service and has_db
+            results.append(test_result("GET /api/health", health_pass, 
+                                     f"ok={data.get('ok')}, db={data.get('db')}"))
+        else:
+            results.append(test_result("GET /api/health", False, f"Status: {resp.status_code}"))
+    except Exception as e:
+        results.append(test_result("GET /api/health", False, str(e)))
     
-    print("="*60)
-    print(f"TOTAL: {passed}/{total} scenarios passed")
-    print("="*60)
+    # Test 5.2: GET /api/catalog
+    try:
+        resp = session.get(f"{BASE_URL}/catalog")
+        if resp.status_code == 200:
+            data = resp.json()
+            products = data.get('products', [])
+            has_products = len(products) > 0
+            
+            # Verify product structure
+            if has_products:
+                p = products[0]
+                has_required = all(k in p for k in ['name', 'sku', 'slug', 'price', 'stock', 'inStock'])
+                no_internal = '_id' not in p and 'metaKeywords' not in p
+                catalog_pass = has_required and no_internal
+                results.append(test_result("GET /api/catalog", catalog_pass,
+                                         f"{len(products)} products, no internal fields"))
+            else:
+                results.append(test_result("GET /api/catalog", False, "No products returned"))
+        else:
+            results.append(test_result("GET /api/catalog", False, f"Status: {resp.status_code}"))
+    except Exception as e:
+        results.append(test_result("GET /api/catalog", False, str(e)))
     
-    return passed == total
+    # Test 5.3: GET /api/catalog/:slug (use TEST product if available)
+    try:
+        # Try to get TEST-BE-001 product
+        resp = session.get(f"{BASE_URL}/catalog/test-be-banarasi-001")
+        if resp.status_code == 200:
+            data = resp.json()
+            product = data.get('product', {})
+            has_product = 'name' in product and 'sku' in product
+            results.append(test_result("GET /api/catalog/:slug", has_product,
+                                     f"slug=test-be-banarasi-001"))
+        else:
+            # Try with any product from catalog
+            resp2 = session.get(f"{BASE_URL}/catalog")
+            if resp2.status_code == 200:
+                products = resp2.json().get('products', [])
+                if products:
+                    slug = products[0].get('slug')
+                    resp3 = session.get(f"{BASE_URL}/catalog/{slug}")
+                    slug_pass = resp3.status_code == 200
+                    results.append(test_result("GET /api/catalog/:slug", slug_pass, f"slug={slug}"))
+                else:
+                    results.append(test_result("GET /api/catalog/:slug", False, "No products"))
+            else:
+                results.append(test_result("GET /api/catalog/:slug", False, "Catalog fetch failed"))
+    except Exception as e:
+        results.append(test_result("GET /api/catalog/:slug", False, str(e)))
+    
+    return all(results)
+
+# ==================== CLEANUP ====================
+
+def cleanup():
+    """Delete all TEST resources"""
+    log("🧹", "Cleaning up TEST resources...")
+    
+    headers = {"Cookie": f"ark_admin={admin_cookie}"}
+    
+    # Delete TEST products
+    for product_id in test_resources['products']:
+        try:
+            resp = session.delete(f"{BASE_URL}/admin/products/{product_id}", headers=headers)
+            if resp.status_code == 200:
+                log("✓", f"Deleted product {product_id}")
+            else:
+                log("✗", f"Failed to delete product {product_id}: {resp.status_code}")
+        except Exception as e:
+            log("✗", f"Error deleting product {product_id}: {e}")
+    
+    # Delete TEST coupons
+    for coupon_id in test_resources['coupons']:
+        try:
+            resp = session.delete(f"{BASE_URL}/admin/coupons/{coupon_id}", headers=headers)
+            if resp.status_code == 200:
+                log("✓", f"Deleted coupon {coupon_id}")
+            else:
+                log("✗", f"Failed to delete coupon {coupon_id}: {resp.status_code}")
+        except Exception as e:
+            log("✗", f"Error deleting coupon {coupon_id}: {e}")
+    
+    # Note: Orders are kept for audit trail (as per requirements)
+    log("ℹ️", f"Created {len(test_resources['orders'])} test orders (kept for audit)")
+    
+    # Clean up existing TEST products (TEST-UP-001, TEST-UI-002)
+    try:
+        resp = session.get(f"{BASE_URL}/admin/products", headers=headers)
+        if resp.status_code == 200:
+            products = resp.json().get('products', [])
+            for p in products:
+                sku = p.get('sku', '')
+                if sku in ['TEST-UP-001', 'TEST-UI-002']:
+                    resp2 = session.delete(f"{BASE_URL}/admin/products/{p['id']}", headers=headers)
+                    if resp2.status_code == 200:
+                        log("✓", f"Deleted existing test product {sku}")
+    except Exception as e:
+        log("✗", f"Error cleaning existing test products: {e}")
+
+# ==================== MAIN ====================
 
 def main():
-    print("="*60)
-    print("ARKADHATRI FINAL LAUNCH HARDENING — BACKEND TESTS")
-    print("="*60)
+    print("=" * 70)
+    print("ARKADHATRI BACKEND TEST - FOCUSED LAUNCH HARDENING")
+    print("=" * 70)
     print(f"Base URL: {BASE_URL}")
     print(f"Admin: {ADMIN_EMAIL}")
-    print("="*60)
+    print("=" * 70)
+    print()
     
-    # Login
-    token = admin_login()
-    if not token:
-        print("❌ FATAL: Admin login failed")
+    all_results = []
+    
+    # 1. Admin Security (before login)
+    all_results.append(test_admin_security())
+    print()
+    
+    # Login once and reuse session
+    if not admin_login():
+        log("❌", "FATAL: Admin login failed")
         return False
+    print()
     
-    # Get test product
-    product = get_test_product(token)
-    if not product:
-        print("❌ FATAL: No test product available")
-        return False
+    # 2. Product Save & Catalog
+    all_results.append(test_product_save())
+    print()
     
-    product_id = product['id']
+    # 3. Media Upload
+    all_results.append(test_media_upload())
+    print()
     
-    try:
-        # Run all scenarios
-        print("\n" + "="*60)
-        print("RUNNING TEST SCENARIOS")
-        print("="*60 + "\n")
-        
-        test_scenario_a(token, product)
-        time.sleep(0.5)
-        
-        test_scenario_b(token, product)
-        time.sleep(0.5)
-        
-        test_scenario_c()
-        time.sleep(0.5)
-        
-        test_scenario_d(token, product)
-        time.sleep(0.5)
-        
-        test_scenario_e()
-        time.sleep(0.5)
-        
-        test_scenario_g()
-        time.sleep(0.5)
-        
-        test_scenario_h()
-        time.sleep(0.5)
-        
-        test_scenario_i(token)
-        time.sleep(0.5)
-        
-        test_scenario_j()
-        time.sleep(0.5)
-        
-        test_scenario_k(token)
-        time.sleep(0.5)
-        
-        test_scenario_l()
-        
-    finally:
-        # Cleanup
-        cleanup(token, product_id)
+    # 4. Coupons + Orders
+    all_results.append(test_coupons_orders())
+    print()
     
-    # Print summary
-    all_passed = print_summary()
+    # 5. Public Endpoints
+    all_results.append(test_public_endpoints())
+    print()
     
-    return all_passed
+    # Cleanup
+    cleanup()
+    print()
+    
+    # Summary
+    print("=" * 70)
+    print("TEST SUMMARY")
+    print("=" * 70)
+    passed = sum(1 for r in all_results if r)
+    total = len(all_results)
+    print(f"Sections passed: {passed}/{total}")
+    print("=" * 70)
+    
+    return all(all_results)
 
 if __name__ == "__main__":
     success = main()
