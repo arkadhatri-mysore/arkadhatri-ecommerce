@@ -21,7 +21,7 @@ const SearchOverlay = ({ open, onClose }) => {
   }, [open])
 
   const { products } = useCatalog()
-  useEffect(() => { setResults(searchProducts(q, products)) }, [q, products])
+  useEffect(() => { setResults(q ? searchProducts(q, products) : []) }, [q, products])
 
   useEffect(() => {
     const esc = (e) => e.key === 'Escape' && onClose()

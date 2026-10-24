@@ -29,7 +29,7 @@ export default function Dashboard() {
     fetch('/api/admin/dashboard').then(r => r.json()).then(setD)
     fetch('/api/admin/inventory?threshold=3').then(r => r.json()).then(setInv)
   }, [])
-  if (!d) return <div className="font-inter text-sm text-[#4A0F1C]/60">Loading dashboard\u2026</div>
+  if (!d) return <div className="font-inter text-sm text-[#4A0F1C]/60">Loading dashboard…</div>
 
   const inr = new Intl.NumberFormat('en-IN')
   // Merge out-of-stock + low-stock, ascending
@@ -62,7 +62,7 @@ export default function Dashboard() {
               <AlertTriangle size={13} strokeWidth={1.6} />
               STOCK ALERTS <span className="text-amber-700/70">({alerts.length})</span>
             </div>
-            <Link href="/admin/inventory" className="font-inter text-xs text-amber-900 hover:underline">Manage inventory \u2192</Link>
+            <Link href="/admin/inventory" className="font-inter text-xs text-amber-900 hover:underline">Manage inventory →</Link>
           </div>
           <div className="divide-y divide-amber-200/60">
             {alerts.map(p => {

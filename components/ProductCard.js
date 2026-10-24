@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Heart, ArrowRight } from 'lucide-react'
 import { cart, inr } from '@/lib/cart'
 import { isSampleImage } from '@/lib/products'
+import HoverVideo from '@/components/HoverVideo'
 
 /**
  * Reusable ProductCard for all product listings.
@@ -39,8 +40,8 @@ const ProductCard = ({ p, variant = 'ivory', showPlaceholder = true }) => {
       {/* Image */}
       <Link href={`/product/${p.slug}`} className="relative block aspect-[3/4] overflow-hidden rounded-sm bg-burgundy-ink/5 mb-4">
         {showPlaceholder && isSampleImage(p.images?.[0] || p.image) && (
-          <span className="absolute top-3 left-3 z-10 px-2 py-1 bg-burgundy-ink/80 backdrop-blur-sm border border-gold/40 rounded-sm font-cinzel text-[0.5rem] tracking-[0.25em] text-gold/95">
-            STUDIO PHOTO PENDING
+          <span className="absolute bottom-3 left-3 z-10 px-2 py-1 bg-burgundy-ink/80 backdrop-blur-sm border border-gold/40 rounded-sm font-cinzel text-[0.5rem] tracking-[0.2em] whitespace-nowrap text-gold/95">
+            SAMPLE PHOTO
           </span>
         )}
         {badges.length > 0 && (
@@ -56,6 +57,7 @@ const ProductCard = ({ p, variant = 'ivory', showPlaceholder = true }) => {
           loading="lazy"
           className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
         />
+        <HoverVideo src={p.videoUrl} poster={p.videoPoster || p.images?.[0]} />
         {/* Wishlist */}
         <button
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); setWishlisted((w) => !w) }}
@@ -67,7 +69,7 @@ const ProductCard = ({ p, variant = 'ivory', showPlaceholder = true }) => {
       </Link>
 
       {/* Meta */}
-      <div className="flex items-start justify-between gap-3 mb-1.5">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 sm:gap-3 mb-1.5">
         <div className="min-w-0">
           <Link href={`/product/${p.slug}`}>
             <h3 className={`font-cormorant text-xl md:text-2xl leading-tight hover:text-gold transition-colors ${primaryText}`}>{p.name}</h3>
@@ -77,7 +79,7 @@ const ProductCard = ({ p, variant = 'ivory', showPlaceholder = true }) => {
             {p.colourName && <span className="opacity-70"> · {p.colourName}</span>}
           </div>
         </div>
-        <div className={`font-cinzel text-[0.7rem] tracking-widest whitespace-nowrap mt-1 ${priceText}`} style={{ fontWeight: 600 }}>
+        <div className={`font-cinzel text-[0.7rem] tracking-widest whitespace-nowrap sm:mt-1 ${priceText}`} style={{ fontWeight: 600 }}>
           {p.currency || '\u20b9'} {inr(p.price)}
         </div>
       </div>

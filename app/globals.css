@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&family=Jost:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -177,3 +177,56 @@ body {
     color: #C8A45A;
   }
 }
+
+
+/* =====================================================================
+   READABILITY PASS
+   Headlines keep Cormorant Garamond. Body copy, taglines, descriptions
+   and small text switch to Jost, with stronger contrast and larger labels.
+   ===================================================================== */
+.font-cormorant {
+  font-family: 'Jost', 'Inter', sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.005em;
+}
+.font-cormorant.italic { font-style: normal; }
+
+/* Keep the elegant serif for every headline & display-size text */
+h1.font-cormorant, h2.font-cormorant, h3.font-cormorant, h4.font-cormorant,
+.font-cormorant.text-2xl, .font-cormorant.text-3xl, .font-cormorant.text-4xl,
+.font-cormorant.text-5xl, .font-cormorant.text-6xl, .font-cormorant.text-7xl,
+.font-cormorant.text-8xl, .font-display {
+  font-family: 'Cormorant Garamond', serif;
+  letter-spacing: normal;
+}
+h1.font-cormorant.italic, h2.font-cormorant.italic, h3.font-cormorant.italic,
+.font-cormorant.italic.text-2xl, .font-cormorant.italic.text-3xl, .font-cormorant.italic.text-4xl,
+.font-cormorant.italic.text-5xl { font-style: italic; }
+
+/* Jost reads larger than Cormorant at the same size: tune paragraph sizes */
+p.font-cormorant.text-xl, div.font-cormorant.text-xl, span.font-cormorant.text-xl { font-size: 1.0625rem; line-height: 1.7; }
+p.font-cormorant.text-lg, div.font-cormorant.text-lg, span.font-cormorant.text-lg, li.font-cormorant.text-lg { font-size: 1rem; line-height: 1.7; }
+p.font-cormorant.text-base, a.font-cormorant.text-base, div.font-cormorant.text-base { font-size: 0.95rem; line-height: 1.65; }
+
+/* Light weights are too thin on most screens */
+.font-light { font-weight: 400 !important; }
+.font-inter.font-light { font-weight: 400 !important; }
+
+/* Contrast: faded text on ivory backgrounds */
+.text-burgundy-ink\/40, .text-burgundy-ink\/50 { color: rgb(42 8 16 / 0.72) !important; }
+.text-burgundy-ink\/60 { color: rgb(42 8 16 / 0.78) !important; }
+.text-burgundy-ink\/70 { color: rgb(42 8 16 / 0.84) !important; }
+.text-burgundy-ink\/75, .text-burgundy-ink\/80, .text-burgundy-ink\/85 { color: rgb(42 8 16 / 0.9) !important; }
+
+/* Contrast: faded text on burgundy backgrounds */
+.text-ivory\/40, .text-ivory\/50 { color: rgb(247 243 235 / 0.72) !important; }
+.text-ivory\/60 { color: rgb(247 243 235 / 0.8) !important; }
+.text-ivory\/70, .text-ivory\/75 { color: rgb(247 243 235 / 0.86) !important; }
+.text-warm-grey { color: #E6E0D6 !important; }
+
+/* Tiny Cinzel labels: never smaller than ~10px */
+.text-\[0\.5rem\]  { font-size: 0.64rem !important; }
+.text-\[0\.55rem\] { font-size: 0.66rem !important; }
+.text-\[0\.58rem\], .text-\[0\.6rem\] { font-size: 0.68rem !important; }
+.text-\[0\.62rem\], .text-\[0\.65rem\] { font-size: 0.7rem !important; }
+.eyebrow { font-size: 0.7rem; }

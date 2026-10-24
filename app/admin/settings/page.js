@@ -36,8 +36,8 @@ export default function Settings() {
         <Field label="GSTIN" k="gst" placeholder="29XXXXX0000X1Z0" />
       </Card>
       <Card title="Shipping">
-        <Field label="Flat Shipping Charge (\u20b9)" k="shippingFlat" type="number" />
-        <Field label="Free Shipping Above (\u20b9)" k="freeShippingThreshold" type="number" />
+        <Field label="Flat Shipping Charge (₹)" k="shippingFlat" type="number" />
+        <Field label="Free Shipping Above (₹)" k="freeShippingThreshold" type="number" />
       </Card>
       <Card title="Contact">
         <Field label="Contact Email" k="contactEmail" />

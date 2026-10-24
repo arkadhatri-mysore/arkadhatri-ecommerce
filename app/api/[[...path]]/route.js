@@ -7,6 +7,7 @@ import { ORDER_STATES, PAYMENT_STATES } from '@/lib/orders'
 import { applyCors } from '@/lib/cors'
 import { rateLimit, ipFromRequest } from '@/lib/rate-limit'
 import { sendOrderConfirmation, sendPaymentFailed } from '@/lib/mailer'
+import { serveMedia } from '@/lib/media'
 
 // Node.js runtime is required for `crypto` and MongoDB.
 export const runtime = 'nodejs'
@@ -208,6 +209,11 @@ async function handleRoute(request, { params }) {
           metaPixel: Boolean(process.env.NEXT_PUBLIC_META_PIXEL_ID)
         }
       }, 200, request)
+    }
+
+    // ================= MEDIA (uploaded photos & videos) =================
+    if (route.match(/^\/media\/[A-Za-z0-9-]+\.[a-z0-9]+$/) && (method === 'GET' || method === 'HEAD')) {
+      return serveMedia(db, route.split('/')[2], request)
     }
 
     // ================= PUBLIC CATALOG =================
@@ -672,3 +678,4 @@ export const POST = handleRoute
 export const PUT = handleRoute
 export const DELETE = handleRoute
 export const PATCH = handleRoute
+export const HEAD = handleRoute

@@ -80,7 +80,8 @@ export default function LuxuryVideo({
     '3/4':  'aspect-[3/4]',
     '1/1':  'aspect-square',
     '16/9': 'aspect-video',
-    '21/9': 'aspect-[21/9]'
+    '21/9': 'aspect-[21/9]',
+    '9/16': 'aspect-[9/16]'
   }[ratio] || 'aspect-[4/5]'
 
   return (

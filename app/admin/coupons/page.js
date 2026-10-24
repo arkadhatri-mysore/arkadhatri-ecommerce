@@ -20,9 +20,9 @@ export default function Coupons() {
         <div className="font-cinzel text-[0.6rem] tracking-[0.32em] text-[#C8A45A] mb-4">— CREATE NEW COUPON</div>
         <div className="grid md:grid-cols-6 gap-3">
           <input placeholder="CODE" value={f.code} onChange={e => setF({...f, code: e.target.value})} className={inp} />
-          <select value={f.type} onChange={e => setF({...f, type: e.target.value})} className={inp}><option value="percentage">% off</option><option value="flat">Flat \u20b9</option></select>
+          <select value={f.type} onChange={e => setF({...f, type: e.target.value})} className={inp}><option value="percentage">% off</option><option value="flat">Flat ₹</option></select>
           <input type="number" placeholder="Value" value={f.value} onChange={e => setF({...f, value: Number(e.target.value)})} className={inp} />
-          <input type="number" placeholder="Min \u20b9" value={f.minPurchase} onChange={e => setF({...f, minPurchase: Number(e.target.value)})} className={inp} />
+          <input type="number" placeholder="Min ₹" value={f.minPurchase} onChange={e => setF({...f, minPurchase: Number(e.target.value)})} className={inp} />
           <input type="date" value={f.expiryDate} onChange={e => setF({...f, expiryDate: e.target.value})} className={inp} />
           <button onClick={create} className="bg-[#C8A45A] text-[#4A0F1C] font-cinzel text-[0.6rem] tracking-[0.3em] uppercase rounded font-semibold">Create</button>
         </div>
@@ -36,8 +36,8 @@ export default function Coupons() {
                 <tr key={c.id} className="border-t border-[#4A0F1C]/10">
                   <td className="px-4 py-3 font-cinzel text-[#4A0F1C]" style={{fontWeight:600}}>{c.code}</td>
                   <td className="px-4 py-3 font-inter">{c.type}</td>
-                  <td className="px-4 py-3 font-inter">{c.type === 'percentage' ? `${c.value}%` : `\u20b9 ${c.value}`}</td>
-                  <td className="px-4 py-3 font-inter">\u20b9 {c.minPurchase || 0}</td>
+                  <td className="px-4 py-3 font-inter">{c.type === 'percentage' ? `${c.value}%` : `₹ ${c.value}`}</td>
+                  <td className="px-4 py-3 font-inter">₹ {c.minPurchase || 0}</td>
                   <td className="px-4 py-3 font-inter text-xs">{c.expiryDate || '—'}</td>
                   <td className="px-4 py-3 font-inter">{c.used || 0}/{c.usageLimit || '∞'}</td>
                   <td className="px-4 py-3 text-right"><button onClick={() => del(c.id)} className="text-red-700"><Trash2 size={14} /></button></td>

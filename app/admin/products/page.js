@@ -57,7 +57,7 @@ export default function ProductsList() {
             </tr>
           </thead>
           <tbody>
-            {loading ? <tr><td colSpan="6" className="p-8 text-center text-[#4A0F1C]/50 font-inter">Loading\u2026</td></tr> :
+            {loading ? <tr><td colSpan="6" className="p-8 text-center text-[#4A0F1C]/50 font-inter">Loading…</td></tr> :
               filtered.length === 0 ? <tr><td colSpan="6" className="p-8 text-center text-[#4A0F1C]/50 font-inter">No products found.</td></tr> :
               filtered.map(p => (
                 <tr key={p.id} className="border-t border-[#4A0F1C]/10 hover:bg-[#F7F3EB]/50">

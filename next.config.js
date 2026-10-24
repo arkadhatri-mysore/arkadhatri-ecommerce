@@ -20,9 +20,11 @@ const nextConfig = {
     return config;
   },
   onDemandEntries: {
-    maxInactiveAge: 10000,
-    pagesBufferLength: 2,
+    maxInactiveAge: 120000,
+    pagesBufferLength: 6,
   },
+  // Preview proxy hosts (dev only; ignored in production builds)
+  allowedDevOrigins: ['*.preview.emergentagent.com', '*.preview.emergentcf.cloud', '*.emergentagent.com'],
   async headers() {
     return [
       {

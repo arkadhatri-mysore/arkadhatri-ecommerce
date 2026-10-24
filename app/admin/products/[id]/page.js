@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Trash2, Save, Plus, X } from 'lucide-react'
 import { FABRIC_CARE, careKeyFor } from '@/lib/care-guide'
 import { isSampleImage } from '@/lib/products'
+import { ImageUploader, VideoUploader } from '@/components/admin/MediaUpload'
 
 const STATUSES = ['draft', 'published', 'hidden', 'out-of-stock']
 const COLLECTIONS = ['silk-sarees', 'wedding-sarees', 'festival-sarees', 'everyday-elegance', 'new-arrivals']
@@ -106,8 +107,8 @@ export default function ProductEditor() {
 
           <Section title="Pricing & Inventory">
             <div className="grid md:grid-cols-3 gap-4">
-              <Field label="Price (\u20b9)"><input type="number" value={p.price} onChange={e => set('price', e.target.value)} className={inp} /></Field>
-              <Field label="Compare-at Price (\u20b9)"><input type="number" value={p.comparePrice} onChange={e => set('comparePrice', e.target.value)} className={inp} /></Field>
+              <Field label="Price (₹)"><input type="number" value={p.price} onChange={e => set('price', e.target.value)} className={inp} /></Field>
+              <Field label="Compare-at Price (₹)"><input type="number" value={p.comparePrice} onChange={e => set('comparePrice', e.target.value)} className={inp} /></Field>
               <Field label="Stock"><input type="number" value={p.stock} onChange={e => set('stock', e.target.value)} className={inp} /></Field>
             </div>
           </Section>
@@ -141,19 +142,27 @@ export default function ProductEditor() {
                 </div>
               ))}
             </div>
+            <ImageUploader onUploaded={(url) => setP(prev => ({ ...prev, images: [...(prev.images || []), url] }))} />
+            <div className="font-inter text-xs text-[#4A0F1C]/50 pt-1">Or paste a link to a photo that is already online:</div>
             <div className="flex gap-2">
               <input value={newImg} onChange={e => setNewImg(e.target.value)} placeholder="Paste image URL" className={`${inp} flex-1`} />
               <button onClick={addImg} type="button" className="inline-flex items-center gap-1 bg-[#4A0F1C] hover:bg-[#3A0B15] text-white font-inter text-sm px-4 rounded transition-colors"><Plus size={14} /> Add</button>
             </div>
-            <p className="font-inter text-xs text-[#4A0F1C]/50 mt-2">The first image is the cover. Paste direct image links (ending in .jpg, .png or .webp) and save. They appear on the shop straight away.</p>
+            <p className="font-inter text-xs text-[#4A0F1C]/50 mt-2">The first image is the cover. Use ↑ / ↓ to reorder, then click Save Changes. Photos appear on the shop straight away.</p>
             {p.images.some(isSampleImage) && (
               <p data-testid="sample-image-warning" className="font-inter text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2 mt-2">
-                Some images are still sample stock photos. While the cover is a sample photo, the shop shows a &ldquo;Studio photo pending&rdquo; tag. Replace it with your own photo to remove the tag.
+                Some images are still sample stock photos. While the cover is a sample photo, the shop shows a &ldquo;Sample photo&rdquo; tag. Replace it with your own photo to remove the tag.
               </p>
             )}
           </Section>
 
-          <Section title="Video (optional)">
+          <Section title="Short Product Video (optional)">
+            <VideoUploader
+              videoUrl={p.videoUrl}
+              videoPoster={p.videoPoster}
+              onChange={({ videoUrl, videoPoster }) => setP(prev => ({ ...prev, videoUrl, videoPoster }))}
+            />
+            <div className="font-inter text-xs text-[#4A0F1C]/50 pt-2">Or paste links to a video that is already online:</div>
             <div className="grid md:grid-cols-2 gap-4">
               <Field label="Video URL (MP4/WebM or hosted)">
                 <input value={p.videoUrl} onChange={e => set('videoUrl', e.target.value)} className={inp} placeholder="https://.../saree-drape.mp4" />
@@ -162,7 +171,7 @@ export default function ProductEditor() {
                 <input value={p.videoPoster} onChange={e => set('videoPoster', e.target.value)} className={inp} placeholder="https://.../poster.jpg" />
               </Field>
             </div>
-            <p className="font-inter text-xs text-[#4A0F1C]/50">Adds a &ldquo;See the saree in motion&rdquo; strip on the product page. Leave blank to hide.</p>
+            
           </Section>
 
           <Section title="Care & Draping Guide">

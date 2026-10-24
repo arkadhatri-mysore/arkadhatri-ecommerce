@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, ChevronRight, Heart, Plus, Minus, ShoppingBag, Truck, RotateCcw, ShieldCheck, MapPin, Instagram, Youtube, Sparkles, Flower2, Award } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Heart, Plus, Minus, ShoppingBag, Truck, RotateCcw, ShieldCheck, MapPin, Instagram, Youtube, Sparkles, Flower2, Award, Play } from 'lucide-react'
 import { getProduct, getRelated } from '@/lib/products'
 import { useCatalog } from '@/lib/catalog'
 import CareGuide from '@/components/CareGuide'
@@ -51,45 +51,72 @@ const Header = () => {
   )
 }
 
-/* ---------------- Gallery ---------------- */
-const Gallery = ({ images = [], name }) => {
+/* ---------------- Gallery (photos + optional short video) ---------------- */
+const Gallery = ({ images = [], name, videoUrl, videoPoster }) => {
   const [active, setActive] = useState(0)
-  if (!images.length) {
+  // Build media list: cover photo first, then the video (if any), then remaining photos
+  const media = images.map((src) => ({ type: 'image', src }))
+  if (videoUrl) media.splice(Math.min(1, media.length), 0, { type: 'video', src: videoUrl, poster: videoPoster || images[0] })
+  if (!media.length) {
     return (
       <div className="relative aspect-[4/5] rounded-sm bg-burgundy-ink/5 border border-burgundy-ink/10 flex items-center justify-center">
         <span className="font-cinzel text-[0.6rem] tracking-[0.35em] text-burgundy-ink/50">STUDIO PHOTOS COMING SOON</span>
       </div>
     )
   }
+  const cur = media[Math.min(active, media.length - 1)]
   return (
     <div className="grid md:grid-cols-[100px_1fr] gap-4 md:gap-6">
-      {/* Thumbnails (vertical on md+, horizontal on mobile — flipped order for mobile) */}
       <div className="order-2 md:order-1 flex md:flex-col gap-3 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
-        {images.map((src, i) => (
+        {media.map((m, i) => (
           <button
             key={i}
             onClick={() => setActive(i)}
-            className={`shrink-0 w-20 md:w-full aspect-[4/5] overflow-hidden rounded-sm border transition-all ${i === active ? 'border-gold ring-1 ring-gold/40' : 'border-burgundy-ink/15 hover:border-burgundy-ink/40'}`}
-            aria-label={`Image ${i + 1}`}
+            data-testid={m.type === 'video' ? 'gallery-video-thumb' : undefined}
+            className={`relative shrink-0 w-20 md:w-full aspect-[4/5] overflow-hidden rounded-sm border transition-all ${i === active ? 'border-gold ring-1 ring-gold/40' : 'border-burgundy-ink/15 hover:border-burgundy-ink/40'}`}
+            aria-label={m.type === 'video' ? 'Play video' : `Image ${i + 1}`}
           >
-            <img src={src} alt="" className="w-full h-full object-cover" loading="lazy" />
+            {m.poster || m.type === 'image'
+              ? <img src={m.type === 'video' ? m.poster : m.src} alt="" className="w-full h-full object-cover" loading="lazy" />
+              : <div className="w-full h-full bg-burgundy-ink" />}
+            {m.type === 'video' && (
+              <span className="absolute inset-0 flex items-center justify-center bg-burgundy-ink/30">
+                <span className="w-8 h-8 rounded-full bg-luxury-ivory/90 flex items-center justify-center">
+                  <Play size={13} strokeWidth={2} fill="#2A0810" className="text-burgundy-ink ml-0.5" />
+                </span>
+              </span>
+            )}
           </button>
         ))}
       </div>
-      {/* Main image */}
       <div className="order-1 md:order-2 relative aspect-[4/5] overflow-hidden rounded-sm bg-burgundy-ink/5">
-        <AnimatePresence mode="wait">
-          <motion.img
-            key={active}
-            src={images[active]}
-            alt={name}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.4 }}
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-        </AnimatePresence>
+        {cur.type === 'video' ? (
+          <div className="absolute inset-0" data-testid="gallery-video">
+            <LuxuryVideo src={cur.src} poster={cur.poster} alt={`${name} in motion`} ratio="4/5" className="w-full h-full" />
+          </div>
+        ) : (
+          <AnimatePresence mode="wait">
+            <motion.img
+              key={active}
+              src={cur.src}
+              alt={name}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.4 }}
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          </AnimatePresence>
+        )}
+        {videoUrl && cur.type !== 'video' && (
+          <button
+            onClick={() => setActive(media.findIndex((m) => m.type === 'video'))}
+            data-testid="watch-video-btn"
+            className="absolute bottom-4 left-4 z-10 inline-flex items-center gap-2 h-10 px-4 rounded-sm bg-burgundy-ink/85 backdrop-blur-sm border border-gold/40 text-gold font-cinzel text-[0.6rem] tracking-[0.3em] uppercase hover:bg-gold hover:text-burgundy-ink transition-colors"
+          >
+            <Play size={12} strokeWidth={2} fill="currentColor" /> Watch the drape
+          </button>
+        )}
       </div>
     </div>
   )
@@ -441,7 +468,7 @@ const ProductPage = () => {
         <div className="grid md:grid-cols-2 gap-10 md:gap-16 lg:gap-20 items-start">
           {/* Left: gallery */}
           <div>
-            <Gallery images={product.images} name={product.name} />
+            <Gallery images={product.images} name={product.name} videoUrl={product.videoUrl} videoPoster={product.videoPoster} />
           </div>
 
           {/* Right: details */}
@@ -486,8 +513,6 @@ const ProductPage = () => {
           </div>
         </div>
 
-        {/* Product video slot (renders only if a video URL or dedicated poster is set) */}
-        <ProductVideoSlot product={product} />
 
         {/* Care & Draping guide (fabric-based, editable per saree in Admin) */}
         <CareGuide product={product} />

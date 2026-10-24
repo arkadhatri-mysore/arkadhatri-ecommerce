@@ -43,7 +43,7 @@ export default function AdminShell({ children }) {
   }
 
   if (isLogin) return <div className="min-h-screen" style={{ background: '#F7F3EB' }}>{children}</div>
-  if (loading) return <div className="min-h-screen flex items-center justify-center" style={{ background: '#F7F3EB' }}><div className="font-cinzel text-sm tracking-widest text-[#4A0F1C]/60">LOADING\u2026</div></div>
+  if (loading) return <div className="min-h-screen flex items-center justify-center" style={{ background: '#F7F3EB' }}><div className="font-cinzel text-sm tracking-widest text-[#4A0F1C]/60">LOADING…</div></div>
 
   return (
     <div className="min-h-screen flex" style={{ background: '#F7F3EB' }}>

@@ -12,6 +12,8 @@ import { useCatalog } from '@/lib/catalog'
 import SearchOverlay from '@/components/SearchOverlay'
 import CraftJourney from '@/components/CraftJourney'
 import LuxuryVideo from '@/components/LuxuryVideo'
+import HoverVideo from '@/components/HoverVideo'
+import InMotion from '@/components/InMotion'
 
 /* ---------------------- ASSETS ---------------------- */
 import { LOGO_URL } from '@/lib/brand'
@@ -352,7 +354,8 @@ const Featured = () => {
   const { products, loading } = useCatalog()
   const featured = products.slice(0, 8).map((p) => ({
     name: p.name, sku: p.sku, slug: p.slug, price: p.price,
-    desc: p.tagline, img: p.images?.[0], isNew: p.isNew, inStock: p.inStock
+    desc: p.tagline, img: p.images?.[0], isNew: p.isNew, inStock: p.inStock,
+    videoUrl: p.videoUrl, videoPoster: p.videoPoster
   }))
   return (
   <section id="featured" className="bg-burgundy-deep py-24 md:py-32">
@@ -380,6 +383,7 @@ const Featured = () => {
           >
             <a href={`/product/${p.slug}`} className="block luxury-card relative aspect-[3/4] mb-4">
               <img src={p.img} alt={p.name} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+              <HoverVideo src={p.videoUrl} poster={p.videoPoster || p.img} showChip={!p.isNew} />
               {p.isNew && <span className="absolute top-3 left-3 px-2.5 py-1 bg-burgundy-ink/85 border border-gold/40 font-cinzel text-[0.5rem] tracking-[0.3em] text-gold">NEW</span>}
               {/* hover actions */}
               <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-500">
@@ -660,6 +664,7 @@ const App = () => (
     <Hero />
     <Collections />
     <Featured />
+    <InMotion />
     <Why />
     <Story />
     <div id="craft"><CraftJourney variant="dark" videoUrl={process.env.NEXT_PUBLIC_CRAFT_VIDEO_URL || ''} posterUrl="https://images.unsplash.com/photo-1623171404570-1d196759fe20?auto=format&fit=crop&w=2000&q=85" /></div>
