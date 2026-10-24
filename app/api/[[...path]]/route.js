@@ -8,6 +8,7 @@ import { applyCors } from '@/lib/cors'
 import { rateLimit, ipFromRequest } from '@/lib/rate-limit'
 import { sendOrderConfirmation, sendPaymentFailed, sendRefundProcessed } from '@/lib/mailer'
 import { serveMedia } from '@/lib/media'
+import { paymentsEnabled, releaseOrderReservation, expireStaleReservations, getStoreSettings, shippingFor } from '@/lib/inventory'
 
 // Node.js runtime is required for `crypto` and MongoDB.
 export const runtime = 'nodejs'
@@ -24,11 +25,21 @@ function safeEqualHex(aHex, bHex) {
 // -------- MongoDB --------
 let client
 let db
+let connecting = null
 async function connectToMongo() {
-  if (!client) {
-    client = new MongoClient(process.env.MONGO_URL)
-    await client.connect()
-    db = client.db(process.env.DB_NAME)
+  // Concurrent first requests share one connection promise (prevents "db is undefined" races)
+  if (db) return db
+  if (!connecting) connecting = (async () => {
+    const c = new MongoClient(process.env.MONGO_URL)
+    await c.connect()
+    client = c
+    const d = c.db(process.env.DB_NAME)
+    db = d
+    return d
+  })().catch((e) => { connecting = null; throw e })
+  await connecting
+  if (!globalThis.__arkIndexes) {
+    globalThis.__arkIndexes = true
     // Ensure indexes (idempotent)
     await Promise.all([
       db.collection('orders').createIndex({ id: 1 }, { unique: true }).catch(()=>{}),
@@ -119,6 +130,38 @@ async function releaseStock(db, items) {
   }
 }
 
+// Marks an order PAID exactly once without ever overselling.
+// Normal path: the order still holds its reservation -> commit it.
+// Late path (reservation expired/cancelled before payment arrived): try to re-reserve;
+// if stock is gone, record the payment but flag the order for refund instead of selling stock twice.
+async function commitPaidOrder(db, orderId, set) {
+  const now = new Date()
+  let r = await db.collection('orders').findOneAndUpdate(
+    { id: orderId, paymentStatus: PAYMENT_STATES.PENDING, stockReserved: true },
+    { $set: { ...set, paymentStatus: PAYMENT_STATES.PAID, status: ORDER_STATES.PAID, stockCommitted: true, paidAt: now, updatedAt: now } },
+    { returnDocument: 'after' }
+  )
+  let doc = r?.value ?? r
+  if (doc) return { doc, confirmed: true }
+  const o = await db.collection('orders').findOne({ id: orderId })
+  if (!o || o.paymentStatus !== PAYMENT_STATES.PENDING) return { doc: o, confirmed: false }
+  let reservedOk = true
+  try { await reserveStock(db, o.items || []) } catch { reservedOk = false }
+  r = await db.collection('orders').findOneAndUpdate(
+    { id: orderId, paymentStatus: PAYMENT_STATES.PENDING },
+    { $set: {
+        ...set, paymentStatus: PAYMENT_STATES.PAID, paidAt: now, updatedAt: now, latePayment: true,
+        ...(reservedOk
+          ? { status: ORDER_STATES.PAID, stockReserved: true, stockCommitted: true }
+          : { stockConflict: true, needsRefundReview: true, adminNote: 'Payment arrived after the reservation expired and the saree is no longer in stock. Please refund.' })
+    } },
+    { returnDocument: 'after' }
+  )
+  doc = r?.value ?? r
+  if (!doc && reservedOk) await releaseStock(db, o.items || []) // lost a race: give stock back
+  return { doc: doc || o, confirmed: Boolean(doc && reservedOk) }
+}
+
 async function razorpayCreateOrder({ amount, currency = 'INR', receipt, notes = {} }) {
   const keyId = process.env.RAZORPAY_KEY_ID
   const keySecret = process.env.RAZORPAY_KEY_SECRET
@@ -158,11 +201,14 @@ function publicProduct(p) {
   const details = Object.fromEntries(
     Object.entries(p.details || {}).filter(([, v]) => typeof v === 'string' && v.trim())
   )
-  const { metaKeywords, ...rest } = p
+  const { metaKeywords, archivedFromStatus, archivedAt, restoredAt, ...rest } = p
+  const price = Number(p.price) || 0
+  const cmp = Number(p.comparePrice) || 0
   return {
     ...rest,
     currency: p.currency || '\u20b9',
-    price: Number(p.price) || 0,
+    price,
+    comparePrice: cmp > price ? cmp : 0, // only a genuine higher "was" price is shown
     images: Array.isArray(p.images) ? p.images.filter(Boolean) : [],
     occasion: Array.isArray(p.occasion) ? p.occasion : [],
     details,
@@ -216,6 +262,12 @@ async function handleRoute(request, { params }) {
       return serveMedia(db, route.split('/')[2], request)
     }
 
+    // ================= STORE CONFIG (public, non-secret) =================
+    if (route === '/store-config' && method === 'GET') {
+      const st = await getStoreSettings(db)
+      return respond({ paymentsEnabled: paymentsEnabled(), ...st }, 200, request)
+    }
+
     // ================= PUBLIC CATALOG =================
     // GET /api/catalog          -> all visible products (live from DB, edited via Admin)
     // GET /api/catalog/:slug    -> one visible product
@@ -238,6 +290,11 @@ async function handleRoute(request, { params }) {
     if (route === '/orders' && method === 'POST') {
       const rl = rateLimit(`orders:${ipFromRequest(request)}`, { max: 10, windowMs: 60_000 })
       if (!rl.allowed) return respond({ error: 'Too many requests. Please try again shortly.' }, 429, request)
+      // Online payment not configured yet: refuse BEFORE validating or reserving any stock.
+      if (!paymentsEnabled()) {
+        return respond({ error: 'Online payments are opening soon. Please message us on WhatsApp to reserve this saree.', code: 'PAYMENTS_UNAVAILABLE' }, 503, request)
+      }
+      expireStaleReservations(db).catch((e) => console.error('expiry sweep', e))
 
       const body = await request.json()
       const cust = body?.customer || {}
@@ -262,9 +319,8 @@ async function handleRoute(request, { params }) {
       } catch (e) { return respond({ error: e.message }, 400, request) }
 
       // Shipping rule (env-configurable)
-      const freeAbove = Number(process.env.SHIPPING_FREE_ABOVE || 15000)
-      const shippingRate = Number(process.env.SHIPPING_FLAT_RATE || 250)
-      const shipping = priced.subtotal >= freeAbove ? 0 : shippingRate
+      const storeCfg = await getStoreSettings(db)
+      const shipping = shippingFor(priced.subtotal, storeCfg)
       const total = Math.max(0, priced.subtotal + shipping - discount)
 
       // Atomic stock reservation
@@ -461,20 +517,10 @@ async function handleRoute(request, { params }) {
       } catch (e) { /* webhook remains authoritative */ }
 
       // Atomic transition (only if captured; else keep pending — the webhook will finalise)
-      let updated
+      let updated, confirmedNow = false
       if (captured) {
-        updated = await db.collection('orders').findOneAndUpdate(
-          { id: orderId, paymentStatus: PAYMENT_STATES.PENDING },
-          { $set: {
-              paymentStatus: PAYMENT_STATES.PAID,
-              status: ORDER_STATES.PAID,
-              razorpayPaymentId: razorpay_payment_id,
-              stockCommitted: true,
-              paidAt: new Date(),
-              updatedAt: new Date()
-          } },
-          { returnDocument: 'after' }
-        )
+        const res = await commitPaidOrder(db, orderId, { razorpayPaymentId: razorpay_payment_id })
+        updated = res.doc; confirmedNow = res.confirmed
       } else {
         updated = await db.collection('orders').findOneAndUpdate(
           { id: orderId, paymentStatus: PAYMENT_STATES.PENDING },
@@ -487,7 +533,7 @@ async function handleRoute(request, { params }) {
         )
       }
       const orderDoc = (updated?.value ?? updated) || await db.collection('orders').findOne({ id: orderId })
-      if (captured && orderDoc?.paymentStatus === PAYMENT_STATES.PAID) {
+      if (captured && confirmedNow && orderDoc?.paymentStatus === PAYMENT_STATES.PAID) {
         sendOrderConfirmation(orderDoc).catch(err => console.error('mail err', err))
       }
       const { _id, ...safe } = orderDoc || {}
@@ -580,23 +626,12 @@ async function handleRoute(request, { params }) {
       if (!order) return respond({ ok: true, ignored: 'unknown order' }, 200, request)
 
       if (evt.event === 'payment.captured' || evt.event === 'order.paid') {
-        const updated = await db.collection('orders').findOneAndUpdate(
-          { id: order.id, paymentStatus: PAYMENT_STATES.PENDING },
-          { $set: {
-              paymentStatus: PAYMENT_STATES.PAID,
-              status: ORDER_STATES.PAID,
-              razorpayPaymentId: payment.id,
-              stockCommitted: true,
-              paidAt: new Date(),
-              updatedAt: new Date()
-          } },
-          { returnDocument: 'after' }
-        )
-        const fresh = (updated?.value ?? updated) || await db.collection('orders').findOne({ id: order.id })
-        if (fresh?.paymentStatus === PAYMENT_STATES.PAID) {
+        const res = await commitPaidOrder(db, order.id, { razorpayPaymentId: payment?.id || order.razorpayPaymentId })
+        const fresh = res.doc || await db.collection('orders').findOne({ id: order.id })
+        if (res.confirmed) {
           sendOrderConfirmation(fresh).catch(err => console.error('mail err', err))
         }
-        return respond({ ok: true, orderId: order.id, status: 'PAID' }, 200, request)
+        return respond({ ok: true, orderId: order.id, status: fresh?.status }, 200, request)
       }
       if (evt.event === 'payment.authorized') {
         // Payment is authorised but not yet captured. With capture:'automatic' on the order,
@@ -622,10 +657,7 @@ async function handleRoute(request, { params }) {
         // Release reserved stock (payment.failed can still be superseded by a later capture on UPI retry,
         // so we only release if not already captured)
         const stale = (upd?.value ?? upd) || order
-        if (stale?.stockReserved && !stale?.stockCommitted) {
-          await releaseStock(db, stale.items || [])
-          await db.collection('orders').updateOne({ id: order.id }, { $set: { stockReserved: false, updatedAt: new Date() } })
-        }
+        await releaseOrderReservation(db, order.id, 'payment failed')
         sendPaymentFailed(stale).catch(err => console.error('mail err', err))
         return respond({ ok: true, orderId: order.id, status: 'PAYMENT_FAILED' }, 200, request)
       }

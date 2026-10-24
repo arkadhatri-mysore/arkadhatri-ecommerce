@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Plus, Edit, Trash2, Search } from 'lucide-react'
+import { Plus, Edit, Trash2, Search, Archive } from 'lucide-react'
 
 const STATUS_TONES = {
   published: 'bg-green-100 text-green-800',
   draft: 'bg-gray-200 text-gray-700',
   hidden: 'bg-gray-800 text-white',
-  'out-of-stock': 'bg-red-100 text-red-800'
+  'out-of-stock': 'bg-red-100 text-red-800',
+  archived: 'bg-amber-100 text-amber-900'
 }
 
 export default function ProductsList() {
@@ -20,12 +21,22 @@ export default function ProductsList() {
   useEffect(() => { load() }, [])
 
   const del = async (id) => {
-    if (!confirm('Delete this product?')) return
-    await fetch(`/api/admin/products/${id}`, { method: 'DELETE' })
+    if (!confirm('Archive this product? It will be hidden from the shop. Past orders are kept, and you can restore it any time.')) return
+    const r = await fetch(`/api/admin/products/${id}`, { method: 'DELETE' })
+    if (!r.ok) alert('Could not archive this product. Please try again.')
     load()
   }
+  const restore = async (id) => {
+    const r = await fetch(`/api/admin/products/${id}/restore`, { method: 'POST' })
+    if (!r.ok) alert('Could not restore this product.')
+    else alert('Restored as a draft. Open it and set the status to "published" when ready.')
+    load()
+  }
+  const [showArchived, setShowArchived] = useState(false)
 
-  const filtered = items.filter(p => !q || `${p.name} ${p.sku} ${p.fabricType}`.toLowerCase().includes(q.toLowerCase()))
+  const filtered = items
+    .filter(p => showArchived ? p.status === 'archived' : p.status !== 'archived')
+    .filter(p => !q || `${p.name} ${p.sku} ${p.fabricType}`.toLowerCase().includes(q.toLowerCase()))
   const inr = new Intl.NumberFormat('en-IN')
 
   return (
@@ -44,6 +55,7 @@ export default function ProductsList() {
         <div className="p-4 border-b border-[#4A0F1C]/10 flex items-center gap-2">
           <Search size={14} strokeWidth={1.4} className="text-[#4A0F1C]/50" />
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search by name, SKU, fabric..." className="flex-1 outline-none font-inter text-sm text-[#4A0F1C] placeholder:text-[#4A0F1C]/40" />
+          <label className="flex items-center gap-2 font-inter text-sm text-[#4A0F1C] whitespace-nowrap"><input type="checkbox" data-testid="show-archived" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} /> Show archived</label>
         </div>
         <table className="w-full text-sm">
           <thead className="bg-[#4A0F1C]/5">
@@ -79,7 +91,9 @@ export default function ProductsList() {
                   <td className="px-4 py-3 text-right">
                     <div className="inline-flex gap-2">
                       <Link href={`/admin/products/${p.id}`} className="p-1.5 hover:bg-[#C8A45A]/10 text-[#4A0F1C]/70 hover:text-[#C8A45A] rounded transition-colors"><Edit size={14} strokeWidth={1.5} /></Link>
-                      <button onClick={() => del(p.id)} className="p-1.5 hover:bg-red-50 text-[#4A0F1C]/70 hover:text-red-700 rounded transition-colors"><Trash2 size={14} strokeWidth={1.5} /></button>
+                      {p.status === 'archived'
+                        ? <button data-testid="restore-product" onClick={() => restore(p.id)} className="px-2 py-1 font-inter text-xs border border-[#4A0F1C]/20 text-[#4A0F1C] rounded hover:border-[#C8A45A]">Restore</button>
+                        : <button data-testid="archive-product" title="Archive (hide from shop)" aria-label="Archive product" onClick={() => del(p.id)} className="p-1.5 hover:bg-red-50 text-[#4A0F1C]/70 hover:text-red-700 rounded transition-colors"><Archive size={14} strokeWidth={1.5} /></button>}
                     </div>
                   </td>
                 </tr>

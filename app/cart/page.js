@@ -5,15 +5,18 @@ import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, ShoppingBag, Plus, Minus, X, ShieldCheck, Truck, RotateCcw } from 'lucide-react'
 import { cart, inr } from '@/lib/cart'
+import { useStoreConfig, shippingFor } from '@/lib/store-config'
 import CouponBox from '@/components/CouponBox'
 
 import { LOGO_URL } from '@/lib/brand'
 
 const CartPage = () => {
   const [items, setItems] = useState([])
+  const [ready, setReady] = useState(false)
   const [coupon, setCoupon] = useState(null)
+  const { config: cfg } = useStoreConfig()
   useEffect(() => {
-    setItems(cart.get())
+    setItems(cart.get()); setReady(true)
     const sync = () => setItems(cart.get())
     window.addEventListener('cart:changed', sync)
     // Restore coupon from session
@@ -25,7 +28,7 @@ const CartPage = () => {
   }, [])
 
   const subtotal = items.reduce((s, i) => s + i.price * i.qty, 0)
-  const shipping = subtotal >= 15000 || subtotal === 0 ? 0 : 250
+  const shipping = shippingFor(subtotal, cfg)
   // Recompute discount whenever subtotal changes (for percentage coupons)
   const discount = coupon
     ? (coupon.type === 'percentage'
@@ -63,7 +66,9 @@ const CartPage = () => {
           <h1 className="font-cormorant text-4xl md:text-5xl text-burgundy-ink">Your Selection</h1>
         </div>
 
-        {items.length === 0 ? (
+        {!ready ? (
+          <div data-testid="cart-loading" className="py-16 text-center font-inter text-burgundy-ink/70">Loading your bag…</div>
+        ) : items.length === 0 ? (
           <div className="py-16 text-center max-w-md mx-auto">
             <ShoppingBag size={40} strokeWidth={1.2} className="text-burgundy-ink/40 mx-auto mb-6" />
             <p className="font-cormorant italic text-xl text-burgundy-ink/70 mb-8">Your bag is empty. Discover the current curation of sarees.</p>
@@ -90,9 +95,9 @@ const CartPage = () => {
                       </div>
                       <div className="mt-4 flex items-center justify-between gap-3 flex-wrap">
                         <div className="flex items-center gap-3 border border-burgundy-ink/20 rounded-sm">
-                          <button onClick={() => cart.setQty(it.sku, it.qty - 1)} className="w-9 h-9 flex items-center justify-center hover:bg-burgundy-ink/5 transition-colors" aria-label="Decrease"><Minus size={12} strokeWidth={1.5} /></button>
-                          <span className="font-cinzel text-sm w-6 text-center">{it.qty}</span>
-                          <button onClick={() => cart.setQty(it.sku, it.qty + 1)} className="w-9 h-9 flex items-center justify-center hover:bg-burgundy-ink/5 transition-colors" aria-label="Increase"><Plus size={12} strokeWidth={1.5} /></button>
+                          <button onClick={() => cart.setQty(it.sku, it.qty - 1)} data-testid="cart-qty-decrease" className="w-9 h-9 flex items-center justify-center text-burgundy-ink hover:bg-burgundy-ink/5 transition-colors" aria-label="Decrease"><Minus size={14} strokeWidth={2} color="#2A0810" /></button>
+                          <span data-testid="cart-qty" className="font-inter font-semibold text-base text-burgundy-ink w-8 text-center">{it.qty}</span>
+                          <button onClick={() => cart.setQty(it.sku, it.qty + 1)} data-testid="cart-qty-increase" className="w-9 h-9 flex items-center justify-center text-burgundy-ink hover:bg-burgundy-ink/5 transition-colors" aria-label="Increase"><Plus size={14} strokeWidth={2} color="#2A0810" /></button>
                         </div>
                         <div className="font-cinzel text-lg md:text-xl text-burgundy-ink" style={{ fontWeight: 600 }}>{it.currency} {inr(it.price * it.qty)}</div>
                       </div>
@@ -121,8 +126,8 @@ const CartPage = () => {
                       <dd>− ₹ {inr(discount)}</dd>
                     </div>
                   )}
-                  {subtotal > 0 && subtotal < 15000 && (
-                    <div className="text-xs font-cormorant italic text-burgundy-ink/60">Free shipping on orders above ₹ 15,000</div>
+                  {subtotal > 0 && subtotal < cfg.freeShippingThreshold && (
+                    <div className="text-xs font-cormorant italic text-burgundy-ink/60">Free shipping on orders above ₹ {inr(cfg.freeShippingThreshold)}</div>
                   )}
                 </dl>
 

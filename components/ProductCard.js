@@ -7,6 +7,8 @@ import { Heart, ArrowRight } from 'lucide-react'
 import { cart, inr } from '@/lib/cart'
 import { isSampleImage } from '@/lib/products'
 import HoverVideo from '@/components/HoverVideo'
+import PriceTag from '@/components/PriceTag'
+import { wishlist, useWishlist } from '@/lib/wishlist'
 
 /**
  * Reusable ProductCard for all product listings.
@@ -15,7 +17,8 @@ import HoverVideo from '@/components/HoverVideo'
  *  - 'burgundy': dark homepage featured section
  */
 const ProductCard = ({ p, variant = 'ivory', showPlaceholder = true }) => {
-  const [wishlisted, setWishlisted] = useState(false)
+  const [saved] = useWishlist()
+  const wishlisted = saved.includes(p.slug)
   const dark = variant === 'burgundy'
 
   const badges = []
@@ -60,8 +63,10 @@ const ProductCard = ({ p, variant = 'ivory', showPlaceholder = true }) => {
         <HoverVideo src={p.videoUrl} poster={p.videoPoster || p.images?.[0]} />
         {/* Wishlist */}
         <button
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setWishlisted((w) => !w) }}
-          aria-label="Add to wishlist"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); wishlist.toggle(p.slug) }}
+          aria-label={wishlisted ? 'Remove from saved sarees' : 'Save to wishlist'}
+          aria-pressed={wishlisted}
+          data-testid="card-wishlist-btn"
           className={`absolute bottom-3 right-3 z-10 w-10 h-10 flex items-center justify-center rounded-sm backdrop-blur-sm border transition-colors ${heartBg} hover:bg-gold hover:text-burgundy-ink`}
         >
           <Heart size={14} strokeWidth={1.4} fill={wishlisted ? '#C8A45A' : 'none'} className={wishlisted ? 'text-gold' : ''} />
@@ -80,7 +85,7 @@ const ProductCard = ({ p, variant = 'ivory', showPlaceholder = true }) => {
           </div>
         </div>
         <div className={`font-cinzel text-[0.7rem] tracking-widest whitespace-nowrap sm:mt-1 ${priceText}`} style={{ fontWeight: 600 }}>
-          {p.currency || '\u20b9'} {inr(p.price)}
+          <PriceTag price={p.price} compareAt={p.comparePrice} currency={p.currency || '\u20b9'} />
         </div>
       </div>
 

@@ -7,9 +7,26 @@ import { ChevronLeft, MapPin, Instagram, Youtube } from 'lucide-react'
 import { getLegalPage, legalSlugs } from '@/lib/legal'
 
 import { LOGO_URL } from '@/lib/brand'
+import SocialLinks from '@/components/SocialLinks'
+import { useStoreConfig } from '@/lib/store-config'
+import { inr } from '@/lib/cart'
+
+// Fills shipping placeholders in policy text from the live store settings
+const useFill = () => {
+  const { config } = useStoreConfig()
+  // WhatsApp: store settings first, then the same env fallback used by the floating button
+  const waDigits = String(config.whatsappNumber || '').replace(/\D/g, '')
+  const waDisplay = waDigits.length >= 10 ? (config.whatsappDisplay || `+${waDigits}`) : ''
+  const fill = (t) => String(t || '')
+    .replaceAll('{{FREE_SHIPPING_ABOVE}}', inr(config.freeShippingThreshold))
+    .replaceAll('{{SHIPPING_FLAT}}', inr(config.shippingFlat))
+    .replaceAll('{{WHATSAPP}}', waDisplay)
+  return { fill, waDigits: waDisplay ? waDigits : '' }
+}
 
 const LegalPage = () => {
   const { slug } = useParams()
+  const { fill, waDigits } = useFill()
   const page = getLegalPage(slug)
 
   useEffect(() => {
@@ -40,10 +57,14 @@ const LegalPage = () => {
         </div>
 
         <article className="space-y-10">
-          {page.sections.map((s) => (
+          {page.sections.filter((s) => fill(s.p).trim()).map((s) => (
             <div key={s.h}>
               <h2 className="font-cormorant text-2xl md:text-3xl text-burgundy-ink mb-3">{s.h}</h2>
-              <p className="font-inter font-light text-burgundy-ink/75 text-[15px] leading-[1.85] whitespace-pre-wrap">{s.p}</p>
+              {s.wa && waDigits ? (
+                <a data-testid="contact-whatsapp" href={`https://wa.me/${waDigits}`} target="_blank" rel="noopener noreferrer" className="font-inter font-light text-burgundy-ink/75 text-[15px] leading-[1.85] underline underline-offset-4 decoration-gold/60 hover:text-gold transition-colors">{fill(s.p)}</a>
+              ) : (
+                <p className="font-inter font-light text-burgundy-ink/75 text-[15px] leading-[1.85] whitespace-pre-wrap">{fill(s.p)}</p>
+              )}
             </div>
           ))}
         </article>
@@ -60,11 +81,8 @@ const LegalPage = () => {
       <footer className="bg-burgundy-ink border-t border-gold/15 py-8">
         <div className="container flex flex-col md:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2 font-cinzel text-[0.55rem] tracking-[0.35em] text-warm-grey"><MapPin size={11} strokeWidth={1.3} />KARNATAKA · INDIA</div>
-          <div className="font-cormorant italic text-ivory/40 text-sm">© MMXXV ARKADHATRI</div>
-          <div className="flex items-center gap-3">
-            <a href="#" className="w-8 h-8 border border-gold/40 flex items-center justify-center hover:bg-gold group transition-colors rounded-sm"><Instagram size={12} strokeWidth={1.3} className="text-gold group-hover:text-burgundy" /></a>
-            <a href="#" className="w-8 h-8 border border-gold/40 flex items-center justify-center hover:bg-gold group transition-colors rounded-sm"><Youtube size={12} strokeWidth={1.3} className="text-gold group-hover:text-burgundy" /></a>
-          </div>
+          <div className="font-cormorant italic text-ivory/40 text-sm">© {new Date().getFullYear()} ARKADHATRI</div>
+          <SocialLinks size="w-8 h-8" />
         </div>
       </footer>
     </main>

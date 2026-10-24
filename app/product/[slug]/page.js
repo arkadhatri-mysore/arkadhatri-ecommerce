@@ -10,6 +10,24 @@ import { getProduct, getRelated } from '@/lib/products'
 import { useCatalog } from '@/lib/catalog'
 import CareGuide from '@/components/CareGuide'
 import { cart, inr } from '@/lib/cart'
+import PriceTag from '@/components/PriceTag'
+import { wishlist, useWishlist } from '@/lib/wishlist'
+import { useStoreConfig } from '@/lib/store-config'
+import SocialLinks from '@/components/SocialLinks'
+
+const WishlistButton = ({ slug }) => {
+  const [saved] = useWishlist()
+  const on = saved.includes(slug)
+  return (
+    <div className="mt-4 flex items-center gap-4">
+      <button data-testid="pdp-wishlist-btn" aria-pressed={on} onClick={() => wishlist.toggle(slug)} className="flex items-center gap-2 font-cinzel text-[0.6rem] tracking-[0.35em] uppercase text-burgundy-ink/80 hover:text-gold transition-colors">
+        <Heart size={14} strokeWidth={1.4} fill={on ? '#C8A45A' : 'none'} className={on ? 'text-gold' : ''} />
+        {on ? 'Saved to Wishlist' : 'Add to Wishlist'}
+      </button>
+      {on && <Link href="/wishlist" className="font-inter text-sm text-burgundy-ink underline hover:text-gold">View saved</Link>}
+    </div>
+  )
+}
 import TrustStrip from '@/components/TrustStrip'
 import LuxuryVideo from '@/components/LuxuryVideo'
 import { trackEvent } from '@/components/Analytics'
@@ -139,8 +157,8 @@ const AddToBag = ({ product, variant = 'primary' }) => {
       items: [{ item_id: product.sku, item_name: product.name, price: product.price, quantity: 1 }]
     }
     if (variant === 'secondary') {
-      // Buy Now — add and go to checkout
-      cart.add(product)
+      // Buy Now — ensure it is in the bag (no silent quantity increase) and go to checkout
+      cart.ensure(product, 1)
       trackEvent('add_to_cart', evt)
       router.push('/checkout')
       return
@@ -296,7 +314,7 @@ const Related = ({ items }) => (
                 <h3 className="font-cormorant text-xl text-ivory">{p.name}</h3>
                 <p className="font-inter font-light text-ivory/60 text-[12px] mt-0.5">{p.tagline}</p>
               </div>
-              <div className="font-cinzel text-[0.65rem] tracking-widest text-gold whitespace-nowrap mt-1">{p.currency} {inr(p.price)}</div>
+              <div className="font-cinzel text-[0.65rem] tracking-widest text-gold whitespace-nowrap mt-1"><PriceTag price={p.price} compareAt={p.comparePrice} currency={p.currency} /></div>
             </div>
           </Link>
         ))}
@@ -315,28 +333,23 @@ const Footer = () => (
           <p className="mt-4 font-cormorant italic text-ivory/60 text-base leading-relaxed max-w-sm">
             A premium South Indian saree boutique.
           </p>
-          <div className="mt-4 flex items-center gap-2">
-            {[Instagram, Youtube].map((I, i) => (
-              <a key={i} href="#" className="w-9 h-9 border border-gold/40 flex items-center justify-center hover:bg-gold group transition-colors rounded-sm">
-                <I size={13} strokeWidth={1.3} className="text-gold group-hover:text-burgundy" />
-              </a>
-            ))}
-          </div>
+          <SocialLinks />
         </div>
         {[
           { t: 'SHOP', l: [
-            { name: 'Silk Sarees', href: '/#collections' },
-            { name: 'Wedding Sarees', href: '/#collections' },
-            { name: 'Festival Sarees', href: '/#collections' },
-            { name: 'Daily Wear', href: '/#collections' },
-            { name: 'New Arrivals', href: '/#collections' }
+            { name: 'Silk Sarees', href: '/collections/silk-sarees' },
+            { name: 'Wedding Sarees', href: '/collections/wedding-sarees' },
+            { name: 'Festival Sarees', href: '/collections/festival-sarees' },
+            { name: 'Everyday Elegance', href: '/collections/everyday-elegance' },
+            { name: 'New Arrivals', href: '/collections/new-arrivals' }
           ]},
           { t: 'SUPPORT', l: [
-            { name: 'Shipping', href: '#' }, { name: 'Returns', href: '#' },
-            { name: 'Wash Care', href: '#' }, { name: 'Track Order', href: '#' }
+            { name: 'Shipping', href: '/shipping-policy' }, { name: 'Returns', href: '/returns' },
+            { name: 'FAQ', href: '/faq' }, { name: 'Track Order', href: '/track-order' }
           ]},
           { t: 'BOUTIQUE', l: [
-            { name: 'About', href: '/#story' }, { name: 'Contact', href: '/#contact' }
+            { name: 'Saved Sarees', href: '/wishlist' }, { name: 'Contact', href: '/contact' },
+            { name: 'Privacy Policy', href: '/privacy-policy' }, { name: 'Terms', href: '/terms' }
           ]}
         ].map((col) => (
           <div key={col.t}>
@@ -351,17 +364,19 @@ const Footer = () => (
       </div>
       <div className="pt-6 flex flex-col md:flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-2 eyebrow"><MapPin size={11} strokeWidth={1.3} /><span>KARNATAKA · INDIA</span></div>
-        <div className="font-cormorant italic text-ivory/40 text-sm">© MMXXV ARKADHATRI · All rights reserved.</div>
+        <div className="font-cormorant italic text-ivory/40 text-sm">© {new Date().getFullYear()} ARKADHATRI · All rights reserved.</div>
       </div>
     </div>
   </footer>
 )
 
 /* ---------------- Trust strip ---------------- */
-const Trust = () => (
+const Trust = () => {
+  const { config } = useStoreConfig()
+  return (
   <div className="mt-10 grid grid-cols-3 gap-4 pt-8 border-t border-burgundy-ink/15">
     {[
-      { i: Truck,       t: 'Free Karnataka Delivery' },
+      { i: Truck,       t: `Free delivery above ₹ ${inr(config.freeShippingThreshold)}` },
       { i: RotateCcw,   t: 'Easy 7-Day Returns' },
       { i: ShieldCheck, t: 'Authenticity Assured' }
     ].map((x) => (
@@ -371,7 +386,8 @@ const Trust = () => (
       </div>
     ))}
   </div>
-)
+  )
+}
 
 /* ---------------- Page ---------------- */
 const ProductPage = () => {
@@ -459,7 +475,7 @@ const ProductPage = () => {
         <nav className="text-[0.62rem] tracking-[0.3em] uppercase font-cinzel text-burgundy-ink/60 mb-8 flex items-center gap-2 flex-wrap">
           <Link href="/" className="hover:text-gold transition-colors">HOME</Link>
           <ChevronRight size={11} strokeWidth={1.3} />
-          <Link href="/#collections" className="hover:text-gold transition-colors">{(product.collectionName || product.collection || '').toUpperCase()}</Link>
+          <Link href={product.collection ? `/collections/${product.collection}` : '/#collections'} className="hover:text-gold transition-colors">{(product.collectionName || product.collection || '').toUpperCase()}</Link>
           <ChevronRight size={11} strokeWidth={1.3} />
           <span className="text-gold">{product.name.toUpperCase()}</span>
         </nav>
@@ -480,7 +496,7 @@ const ProductPage = () => {
             <p className="mt-3 font-cormorant italic text-xl text-burgundy-ink/70">{product.tagline}</p>
             <div className="mt-6 flex items-baseline gap-3">
               <span className="font-cinzel text-2xl md:text-3xl text-burgundy-ink" style={{ fontWeight: 600 }}>
-                {product.currency} {inr(product.price)}
+                <PriceTag price={product.price} compareAt={product.comparePrice} currency={product.currency} size="lg" />
               </span>
               <span className="font-cormorant italic text-burgundy-ink/50 text-sm">inclusive of all taxes</span>
             </div>
@@ -496,10 +512,7 @@ const ProductPage = () => {
               <AddToBag product={product} variant="primary" />
               <AddToBag product={product} variant="secondary" />
             </div>
-            <button className="mt-4 flex items-center gap-2 font-cinzel text-[0.6rem] tracking-[0.35em] uppercase text-burgundy-ink/70 hover:text-gold transition-colors">
-              <Heart size={14} strokeWidth={1.4} />
-              Add to Wishlist
-            </button>
+            <WishlistButton slug={product.slug} />
 
             <Trust />
 

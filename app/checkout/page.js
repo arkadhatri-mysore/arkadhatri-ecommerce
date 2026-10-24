@@ -6,6 +6,7 @@ import Script from 'next/script'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, ShieldCheck, Lock } from 'lucide-react'
 import { cart, inr } from '@/lib/cart'
+import { useStoreConfig, shippingFor, waLink } from '@/lib/store-config'
 import CouponBox from '@/components/CouponBox'
 import { trackEvent } from '@/components/Analytics'
 
@@ -19,6 +20,7 @@ const input = 'w-full bg-transparent border border-burgundy-ink/20 focus:border-
 const CheckoutPage = () => {
   const router = useRouter()
   const [items, setItems] = useState([])
+  const { config: cfg } = useStoreConfig()
   const [coupon, setCoupon] = useState(null)
   const [form, setForm] = useState({
     fullName: '', email: '', mobile: '',
@@ -52,7 +54,7 @@ const CheckoutPage = () => {
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
   const subtotal = items.reduce((s, i) => s + i.price * i.qty, 0)
-  const shipping = subtotal >= 15000 || subtotal === 0 ? 0 : 250
+  const shipping = shippingFor(subtotal, cfg)
   const discount = coupon
     ? (coupon.type === 'percentage'
         ? Math.round(subtotal * (Number(coupon.value) / 100))
@@ -123,7 +125,7 @@ const CheckoutPage = () => {
 
   const submit = async (e) => {
     e.preventDefault()
-    if (submitting) return // prevent double click
+    if (submitting || !cfg.paymentsEnabled) return // prevent double click / disabled payments
     setError(''); setSubmitting(true)
     try {
       // 1) Create internal order + Razorpay order server-side (single call)
@@ -185,8 +187,22 @@ const CheckoutPage = () => {
           <h1 className="font-cormorant text-4xl md:text-5xl text-burgundy-ink">Your Details</h1>
         </div>
 
-        <form onSubmit={submit} className="grid lg:grid-cols-[1fr_400px] gap-10 lg:gap-16">
-          <div className="space-y-10">
+        <form onSubmit={submit} className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_400px] gap-10 lg:gap-16">
+          <div className="space-y-10 min-w-0">
+            {!cfg.paymentsEnabled && (
+              <div data-testid="payments-unavailable" className="border border-gold/60 bg-gold/5 rounded-sm p-5 md:p-6">
+                <div className="font-cinzel text-[0.62rem] tracking-[0.35em] text-gold mb-2">— ENQUIRE TO ORDER</div>
+                <div className="font-cormorant text-2xl text-burgundy-ink">Online payments are opening soon</div>
+                <p className="font-inter text-burgundy-ink/80 text-[15px] mt-2 leading-relaxed">We are completing our secure payment set-up, so orders cannot be paid online just yet. Message us on WhatsApp to enquire about availability of the sarees in your bag. No payment is taken and no details are needed on this page.</p>
+                {waLink(cfg) && (
+                  <a data-testid="whatsapp-enquiry" href={waLink(cfg, `Hello ARKADHATRI, I would like to enquire about availability of: ${items.map((i) => `${i.name} (${i.sku}) x${i.qty}`).join(', ')}. Total ₹ ${inr(total)}.`)} target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex items-center justify-center max-w-full text-center h-auto min-h-12 py-3 px-6 rounded-sm bg-[#1F7A4D] hover:bg-[#186640] text-white font-inter text-sm font-semibold tracking-wide">
+                    Enquire on WhatsApp{cfg.whatsappDisplay ? ` · ${cfg.whatsappDisplay}` : ''}
+                  </a>
+                )}
+                <div className="mt-4"><Link href="/cart" className="font-inter text-sm text-burgundy-ink/70 underline underline-offset-4 hover:text-gold">Back to your bag</Link></div>
+              </div>
+            )}
+            {cfg.paymentsEnabled && (<>
             <div>
               <div className="font-cinzel text-[0.62rem] tracking-[0.35em] text-burgundy-ink mb-5">— 01 &middot; CONTACT</div>
               <div className="grid md:grid-cols-2 gap-4">
@@ -208,30 +224,26 @@ const CheckoutPage = () => {
             <div>
               <div className="font-cinzel text-[0.62rem] tracking-[0.35em] text-burgundy-ink mb-5">— 03 &middot; PAYMENT</div>
               <label className="flex items-start gap-3 border border-gold/60 bg-gold/5 rounded-sm p-5 cursor-pointer">
-                <input type="radio" name="pay" checked={form.paymentMethod === 'razorpay'} onChange={() => set('paymentMethod', 'razorpay')} className="mt-1 accent-[#C8A45A]" />
-                <div>
-                  <div className="font-cormorant text-xl text-burgundy-ink">Razorpay Secure Payment</div>
-                  <div className="font-inter font-light text-burgundy-ink/60 text-[13px] mt-1">UPI, Cards, Netbanking &amp; Wallets. Payment gateway will open in a secure window.</div>
-                  <div className="mt-2 flex items-center gap-2 font-cinzel text-[0.55rem] tracking-[0.3em] text-gold"><Lock size={11} strokeWidth={1.5} />256-BIT SSL ENCRYPTED</div>
-                </div>
-              </label>
-              <p className="mt-3 font-cormorant italic text-burgundy-ink/50 text-xs">
-                {RZP_KEY_ID
-                  ? 'Payment gateway will open securely for you to complete payment via UPI, cards, netbanking or wallets.'
-                  : 'Note: The atelier will send you a secure payment link within one working day. Your order is reserved.'}
-              </p>
+                  <input type="radio" name="pay" checked={form.paymentMethod === 'razorpay'} onChange={() => set('paymentMethod', 'razorpay')} className="mt-1 accent-[#C8A45A]" />
+                  <div>
+                    <div className="font-cormorant text-xl text-burgundy-ink">Razorpay Secure Payment</div>
+                    <div className="font-inter font-light text-burgundy-ink/60 text-[13px] mt-1">UPI, Cards, Netbanking &amp; Wallets. Payment gateway will open in a secure window.</div>
+                    <div className="mt-2 flex items-center gap-2 font-cinzel text-[0.55rem] tracking-[0.3em] text-gold"><Lock size={11} strokeWidth={1.5} />256-BIT SSL ENCRYPTED</div>
+                  </div>
+                </label>
             </div>
 
             {error && <p className="font-cormorant italic text-red-800">{error}</p>}
 
-            <button type="submit" disabled={submitting} className="btn-luxury-filled w-full disabled:opacity-60">
+            <button type="submit" data-testid="place-order-btn" disabled={submitting} className="btn-luxury-filled w-full disabled:opacity-60 disabled:cursor-not-allowed">
               {submitting ? 'Placing Order\u2026' : `Place Order \u00b7 \u20b9 ${inr(total)}`}
             </button>
             <p className="text-center font-cormorant italic text-burgundy-ink/50 text-xs">By placing the order you agree to our <Link href="/terms" className="underline hover:text-gold">Terms</Link> and <Link href="/privacy-policy" className="underline hover:text-gold">Privacy Policy</Link>.</p>
+            </>)}
           </div>
 
           {/* Summary */}
-          <aside className="lg:sticky lg:top-24 self-start">
+          <aside className="lg:sticky lg:top-24 self-start min-w-0">
             <div className="bg-white/80 border border-burgundy-ink/10 rounded-sm p-6 md:p-8">
               <div className="font-cinzel text-[0.62rem] tracking-[0.35em] text-gold mb-4">— YOUR ORDER</div>
               <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">

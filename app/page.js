@@ -14,6 +14,8 @@ import CraftJourney from '@/components/CraftJourney'
 import LuxuryVideo from '@/components/LuxuryVideo'
 import HoverVideo from '@/components/HoverVideo'
 import InMotion from '@/components/InMotion'
+import PriceTag from '@/components/PriceTag'
+import SocialLinks from '@/components/SocialLinks'
 
 /* ---------------------- ASSETS ---------------------- */
 import { LOGO_URL } from '@/lib/brand'
@@ -224,8 +226,7 @@ const Nav = () => {
             </nav>
             <div className="flex items-center gap-4 sm:gap-5">
               <button onClick={() => setSearchOpen(true)} className="text-ivory hover:text-gold transition-colors" aria-label="Search"><Search size={18} strokeWidth={1.3} /></button>
-              <button className="text-ivory hover:text-gold transition-colors hidden sm:block" aria-label="Account"><User size={18} strokeWidth={1.3} /></button>
-              <button className="text-ivory hover:text-gold transition-colors" aria-label="Wishlist"><Heart size={18} strokeWidth={1.3} /></button>
+              <a href="/wishlist" data-testid="nav-wishlist" className="text-ivory hover:text-gold transition-colors" aria-label="Saved sarees"><Heart size={18} strokeWidth={1.3} /></a>
               <AnimatedBag />
             </div>
           </div>
@@ -355,7 +356,7 @@ const Featured = () => {
   const featured = products.slice(0, 8).map((p) => ({
     name: p.name, sku: p.sku, slug: p.slug, price: p.price,
     desc: p.tagline, img: p.images?.[0], isNew: p.isNew, inStock: p.inStock,
-    videoUrl: p.videoUrl, videoPoster: p.videoPoster
+    videoUrl: p.videoUrl, videoPoster: p.videoPoster, comparePrice: p.comparePrice
   }))
   return (
   <section id="featured" className="bg-burgundy-deep py-24 md:py-32">
@@ -402,7 +403,7 @@ const Featured = () => {
                 <h3 className="font-cormorant text-xl md:text-2xl text-ivory">{p.name}</h3>
                 <p className="font-inter font-light text-ivory/60 text-[12px] md:text-[13px] mt-0.5">{p.desc}</p>
               </div>
-              <div className="font-cinzel text-[0.7rem] tracking-widest text-gold whitespace-nowrap sm:mt-1">₹ {inr(p.price)}</div>
+              <div className="font-cinzel text-[0.7rem] tracking-widest text-gold whitespace-nowrap sm:mt-1"><PriceTag price={p.price} compareAt={p.comparePrice} /></div>
             </div>
             <a href={`/product/${p.slug}`} className="mt-3 inline-flex items-center gap-1 font-cinzel text-[0.55rem] tracking-[0.35em] text-gold hover:text-ivory transition-colors">
               VIEW PRODUCT <ArrowRight size={12} strokeWidth={1.4} />
@@ -538,9 +539,8 @@ const InstaGrid = () => (
       </motion.div>
       <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
         {IMG.gallery.map((g, i) => (
-          <motion.a
+          <motion.div
             key={i}
-            href="#"
             initial={{ opacity: 0, y: 15 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-40px' }}
@@ -551,7 +551,7 @@ const InstaGrid = () => (
             <div className="absolute inset-0 bg-burgundy-ink/0 group-hover:bg-burgundy-ink/55 transition-colors flex items-center justify-center">
               <Instagram size={22} strokeWidth={1.3} className="text-gold opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
-          </motion.a>
+          </motion.div>
         ))}
       </div>
     </div>
@@ -602,13 +602,7 @@ const Footer = () => (
           <p className="mt-6 font-cormorant italic text-ivory/60 text-lg leading-relaxed max-w-sm">
             A premium South Indian saree boutique. Timeless silks, curated for the woman who values quiet elegance.
           </p>
-          <div className="mt-6 flex items-center gap-3">
-            {[Instagram, Youtube].map((I, i) => (
-              <a key={i} href="#" className="w-10 h-10 border border-gold/40 flex items-center justify-center hover:bg-gold group transition-colors rounded-sm">
-                <I size={14} strokeWidth={1.3} className="text-gold group-hover:text-burgundy" />
-              </a>
-            ))}
-          </div>
+          <SocialLinks size="w-10 h-10" />
         </div>
 
         {[
@@ -627,8 +621,8 @@ const Footer = () => (
           { t: 'SUPPORT', l: [
             { name: 'Shipping Policy',    href: '/shipping-policy' },
             { name: 'Return & Refund',    href: '/returns' },
-            { name: 'Wash Care',          href: '/faq' },
-            { name: 'Track Order',        href: '/contact' }
+            { name: 'Saved Sarees',       href: '/wishlist' },
+            { name: 'Track Order',        href: '/track-order' }
           ]},
           { t: 'LEGAL', l: [
             { name: 'Privacy Policy',     href: '/privacy-policy' },
@@ -650,7 +644,7 @@ const Footer = () => (
 
       <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-2 eyebrow"><MapPin size={11} strokeWidth={1.3} /><span>KARNATAKA · INDIA</span></div>
-        <div className="font-cormorant italic text-ivory/40 text-sm">© MMXXV ARKADHATRI · All rights reserved.</div>
+        <div className="font-cormorant italic text-ivory/40 text-sm">© {new Date().getFullYear()} ARKADHATRI · All rights reserved.</div>
         <div className="eyebrow">TIMELESS · SOUTH · INDIAN · ELEGANCE</div>
       </div>
     </div>
