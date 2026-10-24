@@ -109,7 +109,7 @@ const SearchOverlay = ({ open, onClose }) => {
                             <div className="font-inter text-[12px] text-warm-grey mt-0.5">{p.fabricType} · {p.colourName}</div>
                             <div className="font-cinzel text-[0.5rem] tracking-[0.3em] text-gold/70 mt-0.5">{p.sku}</div>
                           </div>
-                          <div className="font-cinzel text-sm text-gold whitespace-nowrap">\u20b9 {inr(p.price)}</div>
+                          <div className="font-cinzel text-sm text-gold whitespace-nowrap">₹ {inr(p.price)}</div>
                           <ArrowRight size={14} strokeWidth={1.3} className="text-gold opacity-0 group-hover:opacity-100 transition-opacity" />
                         </Link>
                       ))}

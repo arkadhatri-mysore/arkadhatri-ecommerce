@@ -58,15 +58,33 @@ export default function ProductEditor() {
   const setD = (k, v) => setP(prev => ({ ...prev, details: { ...prev.details, [k]: v } }))
 
   const save = async () => {
-    setSaving(true)
-    const body = { ...p, tags: tagsStr.split(',').map(t => t.trim()).filter(Boolean) }
-    if (!body.slug) body.slug = body.name.toLowerCase().replace(/\s+/g, '-')
+    if (saving) return
+    const name = String(p.name || '').trim()
+    if (!name) { alert('Please enter a product name before saving.'); return }
+    if (!String(p.sku || '').trim()) { alert('Please enter a SKU before saving.'); return }
+    if (!(Number(p.price) > 0)) { alert('Please enter a price greater than 0.'); return }
+    const body = {
+      ...p,
+      name,
+      price: Number(p.price) || 0,
+      comparePrice: Number(p.comparePrice) || 0,
+      stock: Math.max(0, parseInt(p.stock, 10) || 0),
+      tags: tagsStr.split(',').map(t => t.trim()).filter(Boolean)
+    }
+    if (!body.slug) body.slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
     const url = isNew ? '/api/admin/products' : `/api/admin/products/${id}`
     const method = isNew ? 'POST' : 'PUT'
-    const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-    setSaving(false)
-    if (r.ok) router.push('/admin/products')
-    else { const d = await r.json(); alert(d.error || 'Save failed') }
+    setSaving(true)
+    try {
+      const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d.error || `Save failed (${r.status}). Please try again.`)
+      router.push('/admin/products')
+    } catch (e) {
+      alert(e.message || 'Save failed. Please check your connection and try again.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const addImg = () => { if (newImg) { set('images', [...p.images, newImg]); setNewImg('') } }

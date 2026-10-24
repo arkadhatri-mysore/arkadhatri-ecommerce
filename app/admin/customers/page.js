@@ -18,7 +18,7 @@ export default function Customers() {
                   <td className="px-4 py-3 font-inter text-xs text-[#4A0F1C]/70">{c.email}</td>
                   <td className="px-4 py-3 font-inter text-xs text-[#4A0F1C]/70">{c.phone}</td>
                   <td className="px-4 py-3 font-cinzel text-[#4A0F1C]">{c.orders}</td>
-                  <td className="px-4 py-3 font-cinzel text-[#4A0F1C]">\u20b9 {inr.format(c.spend || 0)}</td>
+                  <td className="px-4 py-3 font-cinzel text-[#4A0F1C]">₹ {inr.format(c.spend || 0)}</td>
                 </tr>
               ))}
           </tbody>

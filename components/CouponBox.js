@@ -67,26 +67,28 @@ export default function CouponBox({ subtotal = 0, applied = null, onApply, onRem
 
   return (
     <div>
-      <form onSubmit={submit} className={`flex items-stretch gap-2 ${compact ? '' : 'mt-1'}`}>
+      <div role="group" aria-label="Coupon code" className={`flex items-stretch gap-2 ${compact ? '' : 'mt-1'}`}>
         <div className="relative flex-1">
           <Tag size={12} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#4A0F1C]/40" />
           <input
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase())}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submit() } }}
             placeholder="HAVE A CODE?"
             className="w-full pl-8 pr-3 py-2.5 bg-transparent border border-[#4A0F1C]/20 focus:border-[#C8A45A] rounded-sm font-cinzel text-[0.65rem] tracking-[0.25em] text-[#4A0F1C] placeholder:text-[#4A0F1C]/40 focus:outline-none uppercase"
             disabled={loading}
           />
         </div>
         <button
-          type="submit"
+          type="button"
+          onClick={submit}
           disabled={loading || !code.trim()}
-          className="px-4 rounded-sm font-cinzel text-[0.6rem] tracking-[0.28em] uppercase bg-[#4A0F1C] text-[#F7F3EB] hover:bg-[#3A0B15] disabled:opacity-50 transition-colors"
+          className="px-4 rounded-sm font-cinzel text-[0.6rem] tracking-[0.28em] uppercase bg-[#4A0F1C] text-[#F7F3EB] hover:bg-[#3A0B15] disabled:opacity-70 transition-colors"
         >
           {loading ? '…' : 'Apply'}
         </button>
-      </form>
-      {error && <p className="mt-2 font-cormorant italic text-[#B03A2E] text-xs">{error}</p>}
+      </div>
+      {error && <p className="mt-2 font-inter text-[#9B2C22] text-sm">{error}</p>}
     </div>
   )
 }

@@ -397,12 +397,12 @@ const Featured = () => {
                   : <AddToBagButton product={{ ...p, images: [p.img], sku: p.sku, currency: '\u20b9' }} size="sm" />}
               </div>
             </a>
-            <div className="flex items-start justify-between gap-2">
-              <div>
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 sm:gap-2">
+              <div className="min-w-0">
                 <h3 className="font-cormorant text-xl md:text-2xl text-ivory">{p.name}</h3>
                 <p className="font-inter font-light text-ivory/60 text-[12px] md:text-[13px] mt-0.5">{p.desc}</p>
               </div>
-              <div className="font-cinzel text-[0.7rem] tracking-widest text-gold whitespace-nowrap mt-1">₹ {inr(p.price)}</div>
+              <div className="font-cinzel text-[0.7rem] tracking-widest text-gold whitespace-nowrap sm:mt-1">₹ {inr(p.price)}</div>
             </div>
             <a href={`/product/${p.slug}`} className="mt-3 inline-flex items-center gap-1 font-cinzel text-[0.55rem] tracking-[0.35em] text-gold hover:text-ivory transition-colors">
               VIEW PRODUCT <ArrowRight size={12} strokeWidth={1.4} />

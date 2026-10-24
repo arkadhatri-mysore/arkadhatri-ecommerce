@@ -71,7 +71,7 @@ export default function ProductsList() {
                     </div>
                   </td>
                   <td className="px-4 py-3 font-cinzel text-xs text-[#4A0F1C]/70">{p.sku}</td>
-                  <td className="px-4 py-3 font-inter text-[#4A0F1C]">\u20b9 {inr.format(p.price || 0)}</td>
+                  <td className="px-4 py-3 font-inter text-[#4A0F1C]">₹ {inr.format(p.price || 0)}</td>
                   <td className="px-4 py-3 font-inter text-[#4A0F1C]">{p.stock ?? '—'}</td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-1 rounded text-[0.55rem] font-cinzel tracking-[0.25em] uppercase ${STATUS_TONES[p.status] || STATUS_TONES.draft}`}>{p.status || 'draft'}</span>

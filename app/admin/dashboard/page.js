@@ -72,7 +72,7 @@ export default function Dashboard() {
                   {p.images?.[0] && <img src={p.images[0]} alt="" className="w-10 h-12 object-cover rounded-sm" />}
                   <div className="flex-1 min-w-0">
                     <div className="font-cormorant text-base text-[#4A0F1C] truncate">{p.name}</div>
-                    <div className="font-inter text-xs text-[#4A0F1C]/60">{p.sku} \u00b7 {p.fabricType}</div>
+                    <div className="font-inter text-xs text-[#4A0F1C]/60">{p.sku} · {p.fabricType}</div>
                   </div>
                   <span className={`px-2 py-1 rounded text-[0.55rem] font-cinzel tracking-[0.25em] uppercase ${oos ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-900'}`}>
                     {oos ? 'OUT OF STOCK' : `LOW \u00b7 ${p.stock}`}
