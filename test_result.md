@@ -237,6 +237,72 @@ backend:
           ✅ inStock computed correctly (false when stock=0, true when stock>0)
           ✅ Stock updates via PATCH /api/admin/products/:id/stock sync to catalog
 
+  - task: "Admin password management/reset, email templates/preview/test, Razorpay refund endpoint"
+    implemented: true
+    working: true
+    file: "lib/admin-auth.js, lib/admin-api.js, lib/mailer.js, app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "critical"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          No Razorpay/SMTP keys configured (user skipped) — test only key-independent behaviour.
+          POST /api/admin/password {currentPassword,newPassword} (auth): wrong current 400; weak (<10, no upper/lower/number) 400; same as current 400;
+          success 200 + new cookie; OLD session cookies become 401 (token version bump); login works with new password, old password 401.
+          MUST restore the password to the original (ArkAdmin@2025) at the end via the same endpoint.
+          POST /api/admin/password/forgot {email}: without SMTP -> 503 for admin email; generic 200 for other emails; rate limit 3/15min (use X-Forwarded-For).
+          POST /api/admin/password/reset {token,newPassword}: invalid token 400, weak 400.
+          GET /api/admin/email/status (auth) -> configured:false + templates list; GET /api/admin/email/preview/<tpl> returns branded HTML for all 8 templates, 404 unknown;
+          POST /api/admin/email/test -> 503 when SMTP missing. All /admin/email/* and /admin/password (POST change) 401 without cookie.
+          POST /api/admin/orders/:id/refund (auth): unknown order 404; Razorpay not configured 503 for an existing order. 401 without cookie.
+          Webhook refund.processed now stores amount/100 (paise->rupees) — cannot be signature-tested without webhook secret (503 expected).
+      - working: true
+        agent: "testing"
+        comment: |
+          ✅ ALL 37 TESTS PASSED - Admin security + email + refund endpoints working correctly
+          
+          PASSWORD CHANGE (12/12 PASS):
+          ✅ Wrong current password returns 400
+          ✅ Weak passwords rejected (short, no uppercase, no lowercase, no numbers) - all return 400
+          ✅ Success with strong temp password (TempArk2026Secure) returns 200 + new cookie
+          ✅ Old session revoked (401 on /api/admin/me)
+          ✅ Login with old password rejected (401)
+          ✅ Login with new password works (200)
+          ✅ PASSWORD RESTORED to ArkAdmin@2025 successfully
+          ✅ Original password verified working after restore
+          
+          FORGOT/RESET PASSWORD (5/5 PASS):
+          ✅ Forgot with admin email returns 503 (SMTP missing) with friendly message
+          ✅ Forgot with other email returns 200 generic response
+          ✅ 4th request within window returns 429 (rate limited at 3/15min)
+          ✅ Reset with invalid token returns 400
+          ✅ Reset with weak password returns 400
+          
+          EMAIL ENDPOINTS (12/12 PASS):
+          ✅ GET /admin/email/status without auth returns 401
+          ✅ GET /admin/email/status with auth returns configured:false + 8 templates
+          ✅ GET /admin/email/preview/<template> returns 200 text/html with "ARKADHATRI" for all 8 templates:
+             - order-confirmation, payment-receipt, payment-failed, order-shipped,
+             - order-delivered, refund-initiated, refund-processed, admin-password-reset
+          ✅ GET /admin/email/preview/unknown returns 404
+          ✅ POST /admin/email/test returns 503 (SMTP missing)
+          ✅ POST /admin/email/test without auth returns 401
+          
+          REFUND ENDPOINT (4/4 PASS):
+          ✅ POST /admin/orders/:id/refund without auth returns 401
+          ✅ POST /admin/orders/nonexistent/refund returns 404
+          ✅ POST /admin/orders/:id/refund for existing order returns 503 "Razorpay is not configured"
+          ✅ All refund endpoints require authentication
+          
+          QUICK REGRESSION (3/3 PASS):
+          ✅ GET /api/health returns 200 {ok:true}
+          ✅ GET /api/catalog returns 200 with 8 products
+          ✅ GET /api/admin/products with auth returns 200 with 8 products
+          
+          CRITICAL: Admin password successfully restored to ArkAdmin@2025 and verified working.
+
   - task: "Media upload + product save validation + admin authorization (see backend task list)"
     implemented: true
     working: true
@@ -446,6 +512,7 @@ metadata:
 
 test_plan:
   current_focus:
+    - "Admin password management/reset, email templates/preview/test, Razorpay refund endpoint"
     - "Media upload + product save validation + admin authorization (see backend task list)"
     - "Final stabilization: coupon fix, mobile cards, typography, admin editor save, photo/video upload UI"
     - "Public live catalog API (GET /api/catalog, GET /api/catalog/:slug)"
@@ -623,3 +690,53 @@ agent_communication:
       ALL TEST RESOURCES CLEANED UP (products, coupons deleted).
       
       READY FOR PRODUCTION LAUNCH. All backend APIs working correctly.
+
+  - agent: "testing"
+    message: |
+      ✅ ADMIN SECURITY + EMAIL + REFUND TESTING COMPLETE - ALL 37 TESTS PASSED
+      
+      Completed focused backend test of NEW admin security + email + refund endpoints.
+      
+      RESULTS BY CATEGORY:
+      
+      1. PASSWORD CHANGE (12/12 PASS):
+         ✅ Wrong current password → 400
+         ✅ Weak passwords rejected (short, no uppercase, no lowercase, no numbers) → 400
+         ✅ Success with strong temp password → 200 + new cookie
+         ✅ Old session revoked → 401 on /api/admin/me
+         ✅ Login with old password → 401
+         ✅ Login with new password → 200
+         ✅ PASSWORD RESTORED to ArkAdmin@2025 successfully ✓
+         ✅ Original password verified working after restore
+      
+      2. FORGOT/RESET PASSWORD (5/5 PASS):
+         ✅ Forgot with admin email → 503 (SMTP missing) with friendly message
+         ✅ Forgot with other email → 200 generic response
+         ✅ 4th request within window → 429 (rate limited at 3/15min)
+         ✅ Reset with invalid token → 400
+         ✅ Reset with weak password → 400
+      
+      3. EMAIL ENDPOINTS (12/12 PASS):
+         ✅ GET /admin/email/status without auth → 401
+         ✅ GET /admin/email/status with auth → configured:false + 8 templates
+         ✅ All 8 email previews return 200 text/html with "ARKADHATRI"
+         ✅ Unknown template → 404
+         ✅ POST /admin/email/test → 503 (SMTP missing)
+         ✅ POST /admin/email/test without auth → 401
+      
+      4. REFUND ENDPOINT (4/4 PASS):
+         ✅ Without auth → 401
+         ✅ Nonexistent order → 404
+         ✅ Existing order → 503 "Razorpay is not configured"
+         ✅ All refund endpoints require authentication
+      
+      5. QUICK REGRESSION (3/3 PASS):
+         ✅ GET /api/health → 200 {ok:true}
+         ✅ GET /api/catalog → 200 with 8 products
+         ✅ GET /api/admin/products with auth → 200 with 8 products
+      
+      CRITICAL CONFIRMATION:
+      ✅ Admin password successfully restored to ArkAdmin@2025 and verified working
+      
+      NO MAJOR ISSUES FOUND. All key-independent behavior working correctly.
+      SMTP and Razorpay keys not configured (expected) - all endpoints handle gracefully.

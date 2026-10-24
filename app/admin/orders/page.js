@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Search, Truck, Save } from 'lucide-react'
+import { RefundBox } from '@/components/admin/SecurityEmailPanel'
 
 const STATUSES = ['all', 'PAYMENT_PENDING', 'PAID', 'PROCESSING', 'PACKED', 'SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED', 'PAYMENT_FAILED', 'REFUND_INITIATED', 'REFUNDED']
 const TONES = {
@@ -91,13 +92,13 @@ export default function Orders() {
       </div>
 
       {selected && (
-        <OrderDrawer order={selected} onClose={() => setSelected(null)} onPatch={patchOrder} saving={saving} />
+        <OrderDrawer order={selected} onClose={() => setSelected(null)} onPatch={patchOrder} saving={saving} onRefunded={(o) => { if (o) setSelected(o); load() }} />
       )}
     </div>
   )
 }
 
-function OrderDrawer({ order, onClose, onPatch, saving }) {
+function OrderDrawer({ order, onClose, onPatch, saving, onRefunded }) {
   const inr = new Intl.NumberFormat('en-IN')
   const [ship, setShip] = useState({
     courier: order.courier || '',
@@ -175,6 +176,8 @@ function OrderDrawer({ order, onClose, onPatch, saving }) {
               </select>
             </label>
           </div>
+
+          <RefundBox order={order} onDone={onRefunded} />
 
           {/* Shipping fields */}
           <div className="border-t border-[#4A0F1C]/10 pt-4">

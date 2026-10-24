@@ -6,7 +6,7 @@ import { handleAdmin } from '@/lib/admin-api'
 import { ORDER_STATES, PAYMENT_STATES } from '@/lib/orders'
 import { applyCors } from '@/lib/cors'
 import { rateLimit, ipFromRequest } from '@/lib/rate-limit'
-import { sendOrderConfirmation, sendPaymentFailed } from '@/lib/mailer'
+import { sendOrderConfirmation, sendPaymentFailed, sendRefundProcessed } from '@/lib/mailer'
 import { serveMedia } from '@/lib/media'
 
 // Node.js runtime is required for `crypto` and MongoDB.
@@ -545,10 +545,14 @@ async function handleRoute(request, { params }) {
         const order = await db.collection('orders').findOne({ razorpayPaymentId: refund.payment_id })
         if (!order) return respond({ ok: true, ignored: 'unknown order for refund' }, 200, request)
         if (evt.event === 'refund.processed') {
-          await db.collection('orders').updateOne(
+          const upd = await db.collection('orders').updateOne(
             { id: order.id, paymentStatus: { $ne: 'refunded' } },
-            { $set: { paymentStatus: 'refunded', status: ORDER_STATES.REFUNDED, refundId: refund.id, refundedAt: new Date(), refundAmount: refund.amount, updatedAt: new Date() } }
+            { $set: { paymentStatus: 'refunded', status: ORDER_STATES.REFUNDED, refundId: refund.id, refundedAt: new Date(), refundAmount: (Number(refund.amount) || 0) / 100, updatedAt: new Date() } }
           )
+          if (upd.modifiedCount) {
+            const fresh = await db.collection('orders').findOne({ id: order.id }, { projection: { _id: 0 } })
+            sendRefundProcessed(fresh).catch(err => console.error('mail err', err))
+          }
         } else if (evt.event === 'refund.failed') {
           await db.collection('orders').updateOne(
             { id: order.id },

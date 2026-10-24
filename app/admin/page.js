@@ -46,6 +46,7 @@ export default function AdminLogin() {
         <button disabled={loading} type="submit" className="w-full bg-[#C8A45A] hover:bg-[#D6B56D] text-[#4A0F1C] font-cinzel text-[0.7rem] tracking-[0.3em] uppercase py-3 rounded transition-colors font-semibold disabled:opacity-60">
           {loading ? 'Signing in\u2026' : 'Sign In'}
         </button>
+        <a href="/admin/forgot-password" data-testid="forgot-password-link" className="block text-center mt-4 font-inter text-sm text-[#4A0F1C]/80 hover:text-[#C8A45A]">Forgot password?</a>
         <div className="mt-6 flex items-center justify-center gap-2 font-inter text-xs text-[#4A0F1C]/50">
           <Lock size={12} strokeWidth={1.5} /> Secure admin session
         </div>

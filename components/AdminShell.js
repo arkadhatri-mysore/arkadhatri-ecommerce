@@ -27,7 +27,7 @@ export default function AdminShell({ children }) {
   const router = useRouter()
   const [me, setMe] = useState(null)
   const [loading, setLoading] = useState(true)
-  const isLogin = path === '/admin' || path === '/admin/login'
+  const isLogin = ['/admin', '/admin/login', '/admin/forgot-password', '/admin/reset-password'].includes(path)
 
   useEffect(() => {
     fetch('/api/admin/me').then(r => r.json()).then((d) => {
