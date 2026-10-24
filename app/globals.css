@@ -180,19 +180,27 @@ body {
 
 
 /* =====================================================================
-   READABILITY PASS
-   Headlines keep Cormorant Garamond. Body copy, taglines, descriptions
-   and small text switch to Jost, with stronger contrast and larger labels.
+   ARKADHATRI TYPOGRAPHY & READABILITY LAYER (single consolidated layer)
+   - Headings (h1-h6, display sizes, eyebrows) keep their approved fonts.
+   - Body text, labels, prices, buttons, forms and tables use Jost.
+   - Body text >= 16px, supporting labels ~14px (tiny badges 13px), weight 400-600.
+   - Contrast tuned for WCAG AA on ivory/white and burgundy backgrounds.
    ===================================================================== */
-.font-cormorant {
-  font-family: 'Jost', 'Inter', sans-serif;
-  font-weight: 400;
-  letter-spacing: 0.005em;
-}
-.font-cormorant.italic { font-style: normal; }
 
-/* Keep the elegant serif for every headline & display-size text */
+/* ---------- 1. Base ---------- */
+html { -webkit-text-size-adjust: 100%; text-rendering: optimizeLegibility; }
+body, .font-inter, .font-cormorant, button, input, select, textarea {
+  font-family: 'Jost', 'Inter', system-ui, sans-serif;
+}
+body { font-size: 1rem; line-height: 1.6; font-weight: 400; -webkit-font-smoothing: antialiased; }
+.font-cormorant { font-weight: 400; letter-spacing: 0.005em; }
+.font-cormorant.italic { font-style: normal; }
+.font-light, .font-extralight, .font-thin { font-weight: 400 !important; }
+p { line-height: 1.6; }
+
+/* ---------- 2. Headings keep the approved serif (unchanged look) ---------- */
 h1.font-cormorant, h2.font-cormorant, h3.font-cormorant, h4.font-cormorant,
+h5.font-cormorant, h6.font-cormorant,
 .font-cormorant.text-2xl, .font-cormorant.text-3xl, .font-cormorant.text-4xl,
 .font-cormorant.text-5xl, .font-cormorant.text-6xl, .font-cormorant.text-7xl,
 .font-cormorant.text-8xl, .font-display {
@@ -200,33 +208,75 @@ h1.font-cormorant, h2.font-cormorant, h3.font-cormorant, h4.font-cormorant,
   letter-spacing: normal;
 }
 h1.font-cormorant.italic, h2.font-cormorant.italic, h3.font-cormorant.italic,
-.font-cormorant.italic.text-2xl, .font-cormorant.italic.text-3xl, .font-cormorant.italic.text-4xl,
-.font-cormorant.italic.text-5xl { font-style: italic; }
+.font-cormorant.italic.text-2xl, .font-cormorant.italic.text-3xl,
+.font-cormorant.italic.text-4xl, .font-cormorant.italic.text-5xl { font-style: italic; }
 
-/* Jost reads larger than Cormorant at the same size: tune paragraph sizes */
-p.font-cormorant.text-xl, div.font-cormorant.text-xl, span.font-cormorant.text-xl { font-size: 1.0625rem; line-height: 1.7; }
-p.font-cormorant.text-lg, div.font-cormorant.text-lg, span.font-cormorant.text-lg, li.font-cormorant.text-lg { font-size: 1rem; line-height: 1.7; }
-p.font-cormorant.text-base, a.font-cormorant.text-base, div.font-cormorant.text-base { font-size: 0.95rem; line-height: 1.65; }
+/* Cinzel stays for headings, section eyebrows and large display numbers only */
+h1.font-cinzel, h2.font-cinzel, h3.font-cinzel, h4.font-cinzel,
+.font-cinzel.text-lg, .font-cinzel.text-xl, .font-cinzel.text-2xl, .font-cinzel.text-3xl,
+.font-cinzel.text-4xl, .font-cinzel.text-5xl, .eyebrow {
+  font-family: 'Cinzel', serif;
+}
+/* Small Cinzel labels, prices, badges, nav and buttons -> clear Jost caps */
+.font-cinzel:not(h1):not(h2):not(h3):not(h4):not(.eyebrow):not(.text-lg):not(.text-xl):not(.text-2xl):not(.text-3xl):not(.text-4xl):not(.text-5xl) {
+  font-family: 'Jost', 'Inter', sans-serif;
+  font-weight: 500;
+  letter-spacing: 0.12em !important;
+}
+.btn-luxury, .btn-luxury-filled {
+  font-family: 'Jost', 'Inter', sans-serif !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.16em !important;
+}
+.eyebrow { font-size: 0.8125rem !important; font-weight: 500; letter-spacing: 0.28em; }
 
-/* Light weights are too thin on most screens */
-.font-light { font-weight: 400 !important; }
-.font-inter.font-light { font-weight: 400 !important; }
+/* ---------- 3. Sizes ---------- */
+/* Paragraph copy: 16-17px */
+p.font-cormorant.text-xl, div.font-cormorant.text-xl, span.font-cormorant.text-xl { font-size: 1.125rem; line-height: 1.6; }
+p.font-cormorant.text-lg, div.font-cormorant.text-lg, span.font-cormorant.text-lg, li.font-cormorant.text-lg { font-size: 1.0625rem; line-height: 1.6; }
+p.text-base, p.text-sm, li.text-sm, li.text-base, blockquote.text-sm { font-size: 1rem !important; line-height: 1.6; }
+p.text-xs { font-size: 0.875rem !important; line-height: 1.55; }
+/* Supporting text & labels: 14-15px */
+.text-xs { font-size: 0.875rem !important; line-height: 1.5; }
+.text-sm { font-size: 0.9375rem !important; line-height: 1.55; }
+/* Arbitrary tiny sizes (base + responsive variants) */
+[class*="text-[0.5rem]"], [class*="text-[0.55rem]"] { font-size: 0.8125rem !important; }
+[class*="text-[0.58rem]"], [class*="text-[0.6rem]"], [class*="text-[0.62rem]"],
+[class*="text-[0.65rem]"], [class*="text-[0.68rem]"], [class*="text-[0.7rem]"],
+[class*="text-[11px]"], [class*="text-[12px]"] { font-size: 0.875rem !important; }
+[class*="text-[0.8rem]"], [class*="text-[13px]"] { font-size: 0.9375rem !important; }
+/* Small fixed circles (cart count, tracking steps) keep their compact size */
+[class*="text-[9px]"] { font-size: 10px !important; letter-spacing: 0 !important; }
+[class*="text-[10px]"] { font-size: 11px !important; letter-spacing: 0 !important; }
+/* Forms: 16px prevents iPhone auto-zoom and reads clearly */
+input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 1rem !important; font-weight: 400; }
+::placeholder { color: rgb(42 8 16 / 0.55) !important; opacity: 1; }
+label { font-weight: 500; }
+th { font-size: 0.8125rem !important; font-weight: 600 !important; letter-spacing: 0.06em; }
+td { font-size: 0.9375rem; }
 
-/* Contrast: faded text on ivory backgrounds */
-.text-burgundy-ink\/40, .text-burgundy-ink\/50 { color: rgb(42 8 16 / 0.72) !important; }
+/* ---------- 4. Contrast ---------- */
+/* Dark text on ivory / white */
+.text-burgundy-ink\/30, .text-burgundy-ink\/40, .text-burgundy-ink\/50 { color: rgb(42 8 16 / 0.74) !important; }
 .text-burgundy-ink\/60 { color: rgb(42 8 16 / 0.78) !important; }
-.text-burgundy-ink\/70 { color: rgb(42 8 16 / 0.84) !important; }
-.text-burgundy-ink\/75, .text-burgundy-ink\/80, .text-burgundy-ink\/85 { color: rgb(42 8 16 / 0.9) !important; }
-
-/* Contrast: faded text on burgundy backgrounds */
-.text-ivory\/40, .text-ivory\/50 { color: rgb(247 243 235 / 0.72) !important; }
-.text-ivory\/60 { color: rgb(247 243 235 / 0.8) !important; }
-.text-ivory\/70, .text-ivory\/75 { color: rgb(247 243 235 / 0.86) !important; }
+.text-burgundy-ink\/70, .text-burgundy-ink\/75 { color: rgb(42 8 16 / 0.84) !important; }
+.text-burgundy-ink\/80, .text-burgundy-ink\/85 { color: rgb(42 8 16 / 0.9) !important; }
+.text-\[\#4A0F1C\]\/40, .text-\[\#4A0F1C\]\/50 { color: rgb(74 15 28 / 0.78) !important; }
+.text-\[\#4A0F1C\]\/60 { color: rgb(74 15 28 / 0.82) !important; }
+.text-\[\#4A0F1C\]\/70, .text-\[\#4A0F1C\]\/80 { color: rgb(74 15 28 / 0.88) !important; }
+/* Light text on burgundy / dark / image overlays */
+.text-ivory\/30, .text-ivory\/40, .text-ivory\/50 { color: rgb(247 243 235 / 0.76) !important; }
+.text-ivory\/60, .text-ivory\/65 { color: rgb(247 243 235 / 0.82) !important; }
+.text-ivory\/70, .text-ivory\/75, .text-ivory\/80 { color: rgb(247 243 235 / 0.88) !important; }
+.text-white\/50, .text-white\/60, .text-white\/70 { color: rgb(255 255 255 / 0.86) !important; }
+.text-gold\/70, .text-gold\/80 { color: rgb(200 164 90 / 0.95) !important; }
 .text-warm-grey { color: #E6E0D6 !important; }
 
-/* Tiny Cinzel labels: never smaller than ~10px */
-.text-\[0\.5rem\]  { font-size: 0.64rem !important; }
-.text-\[0\.55rem\] { font-size: 0.66rem !important; }
-.text-\[0\.58rem\], .text-\[0\.6rem\] { font-size: 0.68rem !important; }
-.text-\[0\.62rem\], .text-\[0\.65rem\] { font-size: 0.7rem !important; }
-.eyebrow { font-size: 0.7rem; }
+/* ---------- 5. Mobile safety ---------- */
+@media (max-width: 640px) {
+  .font-cinzel:not(h1):not(h2):not(h3):not(h4):not(.eyebrow) { letter-spacing: 0.08em !important; }
+  .btn-luxury, .btn-luxury-filled { letter-spacing: 0.12em !important; }
+  .eyebrow { letter-spacing: 0.2em; }
+  h1, h2, h3, p, li, label { overflow-wrap: break-word; }
+}
