@@ -295,7 +295,7 @@ async function handleRoute(request, { params }) {
       if (!rl.allowed) return respond({ error: 'Too many requests. Please try again in a few minutes.' }, 429, request)
       // Online payment not configured yet: refuse BEFORE validating or reserving any stock.
       if (!paymentsEnabled()) {
-        return respond({ error: 'Online payments are opening soon. Please message us on WhatsApp to reserve this saree.', code: 'PAYMENTS_UNAVAILABLE' }, 503, request)
+        return respond({ error: 'Online payments are opening soon. Please message us on WhatsApp to enquire about availability.', code: 'PAYMENTS_UNAVAILABLE' }, 503, request)
       }
       expireStaleReservations(db).catch((e) => console.error('expiry sweep', e))
 

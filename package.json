@@ -6,8 +6,14 @@
         "dev": "NODE_OPTIONS='--max-old-space-size=1536' next dev --hostname 0.0.0.0 --port 3000",
         "dev:no-reload": "next dev --hostname 0.0.0.0 --port 3000",
         "dev:webpack": "next dev --hostname 0.0.0.0 --port 3000",
-        "build": "next build",
-        "start": "next start"
+        "build": "next build && node scripts/prepare-standalone.mjs",
+        "start": "node .next/standalone/server.js",
+        "start:next": "next start",
+        "export:catalog": "node scripts/export-catalog.mjs",
+        "import:catalog": "node scripts/import-catalog.mjs"
+    },
+    "engines": {
+        "node": ">=20.9.0"
     },
     "dependencies": {
         "@hookform/resolvers": "5.1.1",

@@ -102,3 +102,6 @@ supervisord.pid
 credentials.json
 *.key
 .credentials
+
+# Private deployment archives (never commit or serve)
+/deploy-export/
