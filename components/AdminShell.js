@@ -8,7 +8,7 @@ import {
   Settings, LogOut, Tag, ChevronRight
 } from 'lucide-react'
 
-import { LOGO_URL } from '@/lib/brand'
+import BrandLogo from '@/components/BrandLogo'
 
 const NAV = [
   { href: '/admin/dashboard',  icon: LayoutDashboard, label: 'Dashboard' },
@@ -49,12 +49,9 @@ export default function AdminShell({ children }) {
     <div className="min-h-screen flex" style={{ background: '#F7F3EB' }}>
       {/* Sidebar */}
       <aside className="w-64 bg-[#1a0508] text-white flex flex-col fixed h-screen">
-        <div className="p-6 border-b border-white/10 flex items-center gap-3">
-          <img src={LOGO_URL} alt="" className="h-10 object-contain" />
-          <div>
-            <div className="font-cinzel text-[0.65rem] tracking-[0.3em] text-[#C8A45A]">ARKADHATRI</div>
-            <div className="font-cormorant italic text-white/60 text-xs">Admin Suite</div>
-          </div>
+        <div className="p-5 border-b border-white/10">
+          <BrandLogo variant="light" size="sm" />
+          <div className="mt-1.5 pl-[42px] font-inter text-white/60 text-xs">Owner dashboard</div>
         </div>
         <nav className="flex-1 py-4 overflow-y-auto">
           {NAV.map(({ href, icon: I, label }) => {
@@ -84,7 +81,14 @@ export default function AdminShell({ children }) {
           </div>
           <Link href="/" target="_blank" className="text-xs text-[#4A0F1C]/60 hover:text-[#C8A45A] font-inter transition-colors">View Site ↗</Link>
         </div>
-        <div className="p-8">{children}</div>
+        <div className="p-8">
+          {me?.needsPasswordChange && (
+            <div data-testid="bootstrap-password-banner" className="mb-6 border border-[#C8A45A] bg-[#C8A45A]/10 rounded px-4 py-3 font-inter text-sm text-[#4A0F1C]">
+              You are signed in with the starter password from the hosting settings. Please <Link href="/admin/settings" className="underline font-semibold">choose your own password</Link> in Settings → Security.
+            </div>
+          )}
+          {children}
+        </div>
       </main>
     </div>
   )

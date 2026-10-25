@@ -70,12 +70,12 @@ export default function CraftJourney({
   posterUrl
 }) {
   const isDark = variant === 'dark'
-  const bg = isDark ? 'bg-[#4A0F1C]' : 'bg-[#F7F3EB]'
-  const textHead = isDark ? 'text-[#F7F3EB]' : 'text-[#4A0F1C]'
-  const textBody = isDark ? 'text-[#F7F3EB]/70' : 'text-[#4A0F1C]/70'
-  const eyebrowClass = isDark ? 'text-[#C8A45A]' : 'text-[#C8A45A]'
-  const cardBg = isDark ? 'bg-[#3A0B15]/80 border-[#C8A45A]/15' : 'bg-white/70 border-[#4A0F1C]/10'
-  const stepGold = 'text-[#C8A45A]'
+  const bg = isDark ? 'bg-[#35121C]' : 'bg-[#F7F3EB]'
+  const textHead = isDark ? 'text-[#F7F3EB]' : 'text-[#35121C]'
+  const textBody = isDark ? 'text-[#F7F3EB]/70' : 'text-[#35121C]/70'
+  const eyebrowClass = isDark ? 'text-[#A48246]' : 'text-[#A48246]'
+  const cardBg = isDark ? 'bg-[#2C0F17]/80 border-[#A48246]/15' : 'bg-white/70 border-[#35121C]/10'
+  const stepGold = 'text-[#A48246]'
 
   return (
     <section className={`${bg} py-20 md:py-28`}>
@@ -87,7 +87,7 @@ export default function CraftJourney({
         >
           <div className={`font-cinzel text-[0.6rem] tracking-[0.35em] uppercase ${eyebrowClass} mb-4`}>{eyebrow}</div>
           <h2 className={`font-cormorant text-4xl md:text-5xl ${textHead}`}>{heading}</h2>
-          <div className="mx-auto h-px w-20 bg-[#C8A45A] my-6" />
+          <div className="mx-auto h-px w-20 bg-[#A48246] my-6" />
           <p className={`font-cormorant italic text-lg md:text-xl ${textBody}`}>{intro}</p>
         </motion.div>
 
@@ -96,7 +96,7 @@ export default function CraftJourney({
           <motion.div
             initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }} transition={{ duration: 0.8 }}
-            className="mb-14 md:mb-16 rounded-sm overflow-hidden border border-[#C8A45A]/20 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.6)]"
+            className="mb-14 md:mb-16 rounded-sm overflow-hidden border border-[#A48246]/20 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.6)]"
           >
             <LuxuryVideo
               src={videoUrl}
@@ -125,7 +125,7 @@ export default function CraftJourney({
               <div className="p-5 md:p-6">
                 <div className={`font-cinzel text-[0.55rem] tracking-[0.32em] ${stepGold} mb-2 flex items-center gap-2`}>
                   <span>0{i + 1}</span>
-                  <span className="h-px w-6 bg-[#C8A45A]/60" />
+                  <span className="h-px w-6 bg-[#A48246]/60" />
                   <span>{s.tag.replace('— ', '')}</span>
                 </div>
                 <h3 className={`font-cormorant text-xl md:text-2xl leading-[1.15] ${textHead}`}>{s.title}</h3>
@@ -142,7 +142,7 @@ export default function CraftJourney({
             viewport={{ once: true }} transition={{ duration: 0.6, delay: 0.2 }}
             className="text-center mt-14"
           >
-            <Link href={shopHref} className={`inline-flex items-center gap-2 font-cinzel text-[0.62rem] tracking-[0.35em] uppercase px-8 py-3.5 rounded-sm border transition-colors ${isDark ? 'text-[#F7F3EB] border-[#C8A45A] hover:bg-[#C8A45A] hover:text-[#4A0F1C]' : 'text-[#4A0F1C] border-[#C8A45A] hover:bg-[#C8A45A]'}`}>
+            <Link href={shopHref} className={`inline-flex items-center gap-2 font-cinzel text-[0.62rem] tracking-[0.35em] uppercase px-8 py-3.5 rounded-sm border transition-colors ${isDark ? 'text-[#F7F3EB] border-[#A48246] hover:bg-[#A48246] hover:text-[#35121C]' : 'text-[#35121C] border-[#A48246] hover:bg-[#A48246]'}`}>
               {shopLabel} <ArrowRight size={13} strokeWidth={1.5} />
             </Link>
           </motion.div>

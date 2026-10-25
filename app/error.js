@@ -29,7 +29,7 @@ export default function Error({ error, reset }) {
         <p className="font-cormorant text-lg text-burgundy-ink/70 mb-8">Please try again. If it keeps happening, message us on WhatsApp and we&rsquo;ll help right away.</p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <button onClick={() => { try { sessionStorage.clear() } catch {} ; reset?.(); window.location.reload() }} className="btn-luxury-filled">Try Again</button>
-          <Link href="/" className="btn-luxury" style={{ color: '#4A0F1C', borderColor: '#4A0F1C' }}>Back to Shop</Link>
+          <Link href="/" className="btn-luxury" style={{ color: '#35121C', borderColor: '#35121C' }}>Back to Shop</Link>
         </div>
       </div>
     </main>

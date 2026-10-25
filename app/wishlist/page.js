@@ -5,7 +5,7 @@ import { ChevronLeft, Heart } from 'lucide-react'
 import ProductCard from '@/components/ProductCard'
 import { useCatalog } from '@/lib/catalog'
 import { useWishlist } from '@/lib/wishlist'
-import { LOGO_URL } from '@/lib/brand'
+import BrandLogo from '@/components/BrandLogo'
 
 export default function WishlistPage() {
   const [saved, ready] = useWishlist()
@@ -21,7 +21,7 @@ export default function WishlistPage() {
             <ChevronLeft size={16} strokeWidth={1.4} className="group-hover:-translate-x-1 transition-transform" />
             <span className="font-cinzel text-[0.6rem] tracking-[0.35em]">CONTINUE SHOPPING</span>
           </Link>
-          <Link href="/"><img src={LOGO_URL} alt="ARKADHATRI" className="h-12 md:h-14 object-contain" /></Link>
+          <Link href="/"><BrandLogo size="md" /></Link>
           <Link href="/cart" className="font-cinzel text-[0.6rem] tracking-[0.35em] text-burgundy-ink hover:text-gold">MY BAG</Link>
         </div>
       </header>

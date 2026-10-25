@@ -21,7 +21,7 @@ const WishlistButton = ({ slug }) => {
   return (
     <div className="mt-4 flex items-center gap-4">
       <button data-testid="pdp-wishlist-btn" aria-pressed={on} onClick={() => wishlist.toggle(slug)} className="flex items-center gap-2 font-cinzel text-[0.6rem] tracking-[0.35em] uppercase text-burgundy-ink/80 hover:text-gold transition-colors">
-        <Heart size={14} strokeWidth={1.4} fill={on ? '#C8A45A' : 'none'} className={on ? 'text-gold' : ''} />
+        <Heart size={14} strokeWidth={1.4} fill={on ? '#A48246' : 'none'} className={on ? 'text-gold' : ''} />
         {on ? 'Saved to Wishlist' : 'Add to Wishlist'}
       </button>
       {on && <Link href="/wishlist" className="font-inter text-sm text-burgundy-ink underline hover:text-gold">View saved</Link>}
@@ -32,7 +32,10 @@ import TrustStrip from '@/components/TrustStrip'
 import LuxuryVideo from '@/components/LuxuryVideo'
 import { trackEvent } from '@/components/Analytics'
 
-import { LOGO_URL } from '@/lib/brand'
+import BrandLogo from '@/components/BrandLogo'
+import SiteHeader from '@/components/SiteHeader'
+import SiteFooter from '@/components/SiteFooter'
+import ShareEnquire from '@/components/ShareEnquire'
 
 /* ---------------- Header (dual-theme aware) ---------------- */
 const Header = () => {
@@ -52,7 +55,7 @@ const Header = () => {
           <span className="font-cinzel text-[0.6rem] tracking-[0.35em]">BACK TO SHOP</span>
         </Link>
         <Link href="/">
-          <img src={LOGO_URL} alt="ARKADHATRI" className="h-12 md:h-14 object-contain" />
+          <BrandLogo size="md" />
         </Link>
         <Link href="/cart" className="relative text-burgundy-ink hover:text-gold transition-colors" aria-label="Bag">
           <motion.div animate={pulse ? { scale: [1, 1.18, 1] } : { scale: 1 }} transition={{ duration: 0.6 }}>
@@ -100,7 +103,7 @@ const Gallery = ({ images = [], name, videoUrl, videoPoster }) => {
             {m.type === 'video' && (
               <span className="absolute inset-0 flex items-center justify-center bg-burgundy-ink/30">
                 <span className="w-8 h-8 rounded-full bg-luxury-ivory/90 flex items-center justify-center">
-                  <Play size={13} strokeWidth={2} fill="#2A0810" className="text-burgundy-ink ml-0.5" />
+                  <Play size={13} strokeWidth={2} fill="#2A0D14" className="text-burgundy-ink ml-0.5" />
                 </span>
               </span>
             )}
@@ -181,10 +184,10 @@ const AddToBag = ({ product, variant = 'primary' }) => {
     return (
       <motion.button
         onClick={click}
-        animate={{ backgroundColor: added ? '#4A0F1C' : '#C8A45A', color: '#F7F3EB', borderColor: added ? '#4A0F1C' : '#C8A45A' }}
+        animate={{ backgroundColor: added ? '#35121C' : '#A48246', color: '#F7F3EB', borderColor: added ? '#35121C' : '#A48246' }}
         transition={{ duration: 0.35 }}
         className={`${base} border-2 font-semibold`}
-        style={{ boxShadow: '0 6px 20px -10px rgba(200,164,90,0.4)' }}
+        style={{ boxShadow: '0 6px 20px -10px rgba(164,130,70,0.4)' }}
       >
         <AnimatePresence mode="wait" initial={false}>
           {added ? (
@@ -285,7 +288,7 @@ const ProductVideoSlot = ({ product }) => {
   return (
     <section className="mt-14">
       <div className="text-center mb-6">
-        <div className="eyebrow mb-3" style={{color:'#C8A45A'}}>— SEE THE SAREE IN MOTION</div>
+        <div className="eyebrow mb-3" style={{color:'#A48246'}}>— SEE THE SAREE IN MOTION</div>
         <h2 className="font-cormorant text-3xl md:text-4xl text-burgundy-ink">The drape, up close.</h2>
       </div>
       <div className="rounded-sm overflow-hidden border border-burgundy-ink/10 shadow-[0_20px_60px_-30px_rgba(74,15,28,0.4)] max-w-4xl mx-auto">
@@ -329,7 +332,7 @@ const Footer = () => (
     <div className="container">
       <div className="grid md:grid-cols-4 gap-10 pb-10 border-b border-gold/10">
         <div>
-          <img src={LOGO_URL} alt="ARKADHATRI" className="h-16 object-contain" />
+          <BrandLogo variant="light" size="md" />
           <p className="mt-4 font-cormorant italic text-ivory/60 text-base leading-relaxed max-w-sm">
             A premium South Indian saree boutique.
           </p>
@@ -378,7 +381,7 @@ const Trust = () => {
     {[
       { i: Truck,       t: `Free delivery above ₹ ${inr(config.freeShippingThreshold)}` },
       { i: RotateCcw,   t: 'Easy 7-Day Returns' },
-      { i: ShieldCheck, t: 'Authenticity Assured' }
+      { i: ShieldCheck, t: 'Secure checkout' }
     ].map((x) => (
       <div key={x.t} className="flex flex-col items-center text-center gap-2">
         <x.i size={20} strokeWidth={1.3} className="text-gold" />
@@ -399,7 +402,6 @@ const ProductPage = () => {
 
   useEffect(() => {
     if (product) {
-      document.title = product.seoTitle || `${product.name} — ARKADHATRI`
       // Analytics: view_item
       trackEvent('view_item', {
         currency: 'INR',
@@ -412,7 +414,7 @@ const ProductPage = () => {
   if (loading) {
     return (
       <main className="min-h-screen bg-luxury-ivory">
-        <Header />
+        <SiteHeader />
         <div className="container py-8 md:py-14" data-testid="product-loading">
           <div className="grid md:grid-cols-2 gap-10 md:gap-16 animate-pulse">
             <div className="aspect-[4/5] bg-burgundy-ink/5 rounded-sm" />
@@ -432,7 +434,7 @@ const ProductPage = () => {
   if (!product) {
     return (
       <main className="min-h-screen bg-luxury-ivory">
-        <Header />
+        <SiteHeader />
         <div className="container py-32 text-center">
           <div className="eyebrow mb-4">— NOT FOUND</div>
           <h1 className="font-cormorant text-4xl text-burgundy-ink mb-6">This saree is no longer in the atelier.</h1>
@@ -442,33 +444,10 @@ const ProductPage = () => {
     )
   }
 
-  const site = process.env.NEXT_PUBLIC_BASE_URL || 'https://arkadhatri.com'
-  const productSchema = {
-    '@context': 'https://schema.org', '@type': 'Product',
-    name: product.name, sku: product.sku,
-    description: product.seoDescription || product.description,
-    image: product.images,
-    brand: { '@type': 'Brand', name: 'ARKADHATRI' },
-    offers: {
-      '@type': 'Offer', priceCurrency: 'INR', price: product.price,
-      availability: product.inStock === false ? 'https://schema.org/OutOfStock' : 'https://schema.org/InStock',
-      url: `${site}/product/${product.slug}`
-    }
-  }
-  const crumbs = {
-    '@context': 'https://schema.org', '@type': 'BreadcrumbList',
-    itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Home', item: site + '/' },
-      { '@type': 'ListItem', position: 2, name: product.collectionName, item: `${site}/collections/${product.collection}` },
-      { '@type': 'ListItem', position: 3, name: product.name }
-    ]
-  }
-
+  // Structured data (Product/Offer/Breadcrumb) is rendered on the server in ./layout.js
   return (
-    <main className="min-h-screen bg-luxury-ivory">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(crumbs) }} />
-      <Header />
+    <main id="main" className="on-light min-h-screen bg-luxury-ivory">
+      <SiteHeader />
 
       <div className="container py-8 md:py-14">
         {/* Breadcrumb */}
@@ -513,6 +492,7 @@ const ProductPage = () => {
               <AddToBag product={product} variant="secondary" />
             </div>
             <WishlistButton slug={product.slug} />
+            <ShareEnquire product={product} />
 
             <Trust />
 
@@ -533,7 +513,7 @@ const ProductPage = () => {
 
       <Related items={related} />
       <TrustStrip variant="ivory" />
-      <Footer />
+      <SiteFooter />
     </main>
   )
 }

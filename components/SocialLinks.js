@@ -1,6 +1,6 @@
 'use client'
 
-import { Instagram, Youtube } from 'lucide-react'
+import { Instagram, Youtube, Facebook } from 'lucide-react'
 import { useStoreConfig } from '@/lib/store-config'
 
 const Pinterest = (props) => (
@@ -10,10 +10,11 @@ const Pinterest = (props) => (
 )
 
 /** Shows only the social links that are set in Admin → Settings (no placeholder "#" links). */
-export default function SocialLinks({ size = 'w-9 h-9' }) {
+export default function SocialLinks({ size = 'w-11 h-11' }) {
   const { config } = useStoreConfig()
   const links = [
     { href: config.instagram, I: Instagram, label: 'Instagram' },
+    { href: config.facebook, I: Facebook, label: 'Facebook' },
     { href: config.youtube, I: Youtube, label: 'YouTube' },
     { href: config.pinterest, I: Pinterest, label: 'Pinterest' }
   ].filter((l) => l.href)

@@ -21,7 +21,7 @@ const CareGuide = ({ product }) => {
   return (
     <section id="care-guide" data-testid="care-guide" className="mt-16 md:mt-20 border-y border-burgundy-ink/10 py-14 md:py-16">
       <div className="text-center mb-8 md:mb-10">
-        <div className="eyebrow mb-3" style={{ color: '#C8A45A' }}>— THE SAREE GUIDE</div>
+        <div className="eyebrow mb-3" style={{ color: '#A48246' }}>— THE SAREE GUIDE</div>
         <h2 className="font-cormorant text-3xl md:text-5xl text-burgundy-ink">Care &amp; Draping</h2>
         <p className="mt-3 font-cormorant italic text-lg text-burgundy-ink/60 max-w-xl mx-auto">
           So that {product.name} looks the way it did the day it arrived, for years to come.

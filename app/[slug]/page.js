@@ -6,7 +6,7 @@ import { useParams, notFound } from 'next/navigation'
 import { ChevronLeft, MapPin, Instagram, Youtube } from 'lucide-react'
 import { getLegalPage, legalSlugs } from '@/lib/legal'
 
-import { LOGO_URL } from '@/lib/brand'
+import BrandLogo from '@/components/BrandLogo'
 import SocialLinks from '@/components/SocialLinks'
 import { useStoreConfig } from '@/lib/store-config'
 import { inr } from '@/lib/cart'
@@ -30,7 +30,7 @@ const LegalPage = () => {
   const page = getLegalPage(slug)
 
   useEffect(() => {
-    if (page) document.title = `${page.title} \u2014 ARKADHATRI`
+    // title comes from the server layout metadata
   }, [page])
 
   if (!page) return notFound()
@@ -43,7 +43,7 @@ const LegalPage = () => {
             <ChevronLeft size={16} strokeWidth={1.4} className="group-hover:-translate-x-1 transition-transform" />
             <span className="font-cinzel text-[0.6rem] tracking-[0.35em]">MAISON</span>
           </Link>
-          <Link href="/"><img src={LOGO_URL} alt="ARKADHATRI" className="h-12 md:h-14 object-contain" /></Link>
+          <Link href="/"><BrandLogo size="md" /></Link>
           <div className="w-16" />
         </div>
       </header>

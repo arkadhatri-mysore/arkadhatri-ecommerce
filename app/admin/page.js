@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Lock } from 'lucide-react'
 
-import { LOGO_URL } from '@/lib/brand'
+import BrandLogo from '@/components/BrandLogo'
 
 export default function AdminLogin() {
   const router = useRouter()
@@ -30,7 +30,7 @@ export default function AdminLogin() {
     <div className="min-h-screen flex items-center justify-center px-6">
       <form onSubmit={submit} className="w-full max-w-md bg-white border border-[#4A0F1C]/10 rounded p-8 shadow-sm">
         <div className="text-center mb-8">
-          <img src={LOGO_URL} alt="ARKADHATRI" className="h-16 object-contain mx-auto" />
+          <BrandLogo size="lg" stacked />
           <div className="mt-4 font-cinzel text-[0.62rem] tracking-[0.35em] text-[#C8A45A]">— ADMIN SUITE</div>
           <h1 className="font-cormorant text-3xl text-[#4A0F1C] mt-2">Sign in</h1>
         </div>

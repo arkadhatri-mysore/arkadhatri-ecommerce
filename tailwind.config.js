@@ -53,14 +53,14 @@ module.exports = {
         },
         // Brand palette
         burgundy: {
-          DEFAULT: '#4A0F1C',
-          deep: '#3A0B15',
-          ink: '#2A0810'
+          DEFAULT: '#35121C',
+          deep: '#2C0F17',
+          ink: '#2A0D14'
         },
         gold: {
-          DEFAULT: '#C8A45A',
-          light: '#D9BB7A',
-          dark: '#9E7F3D'
+          DEFAULT: '#A48246',
+          light: '#BC9A5C',
+          dark: '#7E6230'
         },
         matte: '#111111',
         ivory: '#F7F3EB'

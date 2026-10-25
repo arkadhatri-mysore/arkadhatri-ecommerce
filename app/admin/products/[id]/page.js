@@ -188,6 +188,9 @@ export default function ProductEditor() {
               <Field label="Video Poster URL (fallback / preview image)">
                 <input value={p.videoPoster} onChange={e => set('videoPoster', e.target.value)} className={inp} placeholder="https://.../poster.jpg" />
               </Field>
+              <Field label="Instagram reel / YouTube link (optional, shown as a 'Watch' link)">
+                <input value={p.reelUrl || ''} onChange={e => set('reelUrl', e.target.value)} className={inp} placeholder="https://www.instagram.com/reel/..." />
+              </Field>
             </div>
             
           </Section>

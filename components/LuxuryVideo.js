@@ -124,7 +124,7 @@ export default function LuxuryVideo({
 
       {/* Optional burgundy gradient overlay for text over video */}
       {overlay && (
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#4A0F1C]/40 via-transparent to-[#4A0F1C]/70" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#35121C]/40 via-transparent to-[#35121C]/70" />
       )}
 
       {/* Foreground children (captions, CTAs) */}
@@ -137,7 +137,7 @@ export default function LuxuryVideo({
             type="button"
             onClick={toggle}
             aria-label={playing ? 'Pause video' : 'Play video'}
-            className="w-9 h-9 flex items-center justify-center rounded-full bg-[#111111]/70 backdrop-blur text-[#C8A45A] hover:text-[#F7F3EB] transition-colors"
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-[#111111]/70 backdrop-blur text-[#A48246] hover:text-[#F7F3EB] transition-colors"
           >
             {playing ? <Pause size={14} strokeWidth={1.6} /> : <Play size={14} strokeWidth={1.6} className="translate-x-[1px]" />}
           </button>
@@ -145,7 +145,7 @@ export default function LuxuryVideo({
             type="button"
             onClick={toggleMute}
             aria-label={isMuted ? 'Unmute video' : 'Mute video'}
-            className="w-9 h-9 flex items-center justify-center rounded-full bg-[#111111]/70 backdrop-blur text-[#C8A45A] hover:text-[#F7F3EB] transition-colors"
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-[#111111]/70 backdrop-blur text-[#A48246] hover:text-[#F7F3EB] transition-colors"
           >
             {isMuted ? <VolumeX size={14} strokeWidth={1.6} /> : <Volume2 size={14} strokeWidth={1.6} />}
           </button>

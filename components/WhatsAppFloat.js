@@ -34,11 +34,11 @@ export default function WhatsAppFloat() {
       title={`WhatsApp · ${display}`}
       className={`fixed bottom-5 right-5 md:bottom-7 md:right-7 z-[80] group transition-all duration-700 ease-out ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3 pointer-events-none'}`}
     >
-      <span className="absolute inset-0 rounded-full bg-[#C8A45A]/25 animate-ping" aria-hidden="true" />
+      <span className="absolute inset-0 rounded-full bg-[#A48246]/25 animate-ping" aria-hidden="true" />
       <span
         className="relative flex items-center justify-center w-14 h-14 md:w-16 md:h-16 rounded-full shadow-lg"
         style={{
-          background: 'linear-gradient(140deg, #D6B56D 0%, #C8A45A 50%, #A8853C 100%)',
+          background: 'linear-gradient(140deg, #B48F50 0%, #A48246 50%, #A8853C 100%)',
           boxShadow: '0 12px 30px -8px rgba(74,15,28,0.45), inset 0 1px 0 rgba(255,255,255,0.35)'
         }}
       >
@@ -46,7 +46,7 @@ export default function WhatsAppFloat() {
           viewBox="0 0 24 24"
           width="26"
           height="26"
-          fill="#4A0F1C"
+          fill="#35121C"
           xmlns="http://www.w3.org/2000/svg"
           aria-hidden="true"
           className="drop-shadow-sm"

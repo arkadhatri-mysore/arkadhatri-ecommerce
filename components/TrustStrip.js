@@ -7,10 +7,10 @@ import { ShieldCheck, Truck, Award, RotateCcw } from 'lucide-react'
 const TrustStrip = ({ variant = 'ivory' }) => {
   const dark = variant === 'burgundy'
   const items = [
-    { i: ShieldCheck, t: 'Secure Payments' },
-    { i: Truck,       t: 'Fast Delivery Across India' },
-    { i: Award,       t: 'Quality Checked' },
-    { i: RotateCcw,   t: 'Easy Returns' }
+    { i: ShieldCheck, t: 'Secure Checkout' },
+    { i: Truck,       t: 'Shipping Within India' },
+    { i: Award,       t: 'Checked Before Dispatch' },
+    { i: RotateCcw,   t: 'Returns As Per Policy' }
   ]
   return (
     <div className={`grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 ${dark ? 'bg-burgundy-ink' : 'bg-luxury-ivory'} py-8 md:py-10 border-y ${dark ? 'border-gold/15' : 'border-burgundy-ink/10'}`}>

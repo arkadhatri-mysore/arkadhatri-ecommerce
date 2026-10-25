@@ -44,19 +44,19 @@ export default function CouponBox({ subtotal = 0, applied = null, onApply, onRem
 
   if (applied) {
     return (
-      <div className="flex items-center justify-between gap-3 border border-[#C8A45A]/50 bg-[#C8A45A]/10 rounded-sm px-3 py-2.5">
+      <div className="flex items-center justify-between gap-3 border border-[#A48246]/50 bg-[#A48246]/10 rounded-sm px-3 py-2.5">
         <div className="flex items-center gap-2 min-w-0">
-          <Check size={14} strokeWidth={1.6} className="text-[#4A0F1C] shrink-0" />
+          <Check size={14} strokeWidth={1.6} className="text-[#35121C] shrink-0" />
           <div className="min-w-0">
-            <div className="font-cinzel text-[0.6rem] tracking-[0.3em] text-[#4A0F1C] truncate">{applied.code} APPLIED</div>
-            <div className="font-cormorant italic text-[#4A0F1C]/70 text-xs">
+            <div className="font-cinzel text-[0.6rem] tracking-[0.3em] text-[#35121C] truncate">{applied.code} APPLIED</div>
+            <div className="font-cormorant italic text-[#35121C]/70 text-xs">
               You save ₹ {inr.format(applied.discount || 0)}
             </div>
           </div>
         </div>
         <button
           onClick={onRemove}
-          className="shrink-0 text-[#4A0F1C]/60 hover:text-[#4A0F1C] transition-colors"
+          className="shrink-0 text-[#35121C]/60 hover:text-[#35121C] transition-colors"
           aria-label="Remove coupon"
         >
           <X size={14} strokeWidth={1.6} />
@@ -69,13 +69,13 @@ export default function CouponBox({ subtotal = 0, applied = null, onApply, onRem
     <div>
       <div role="group" aria-label="Coupon code" className={`flex items-stretch gap-2 ${compact ? '' : 'mt-1'}`}>
         <div className="relative flex-1">
-          <Tag size={12} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#4A0F1C]/40" />
+          <Tag size={12} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#35121C]/40" />
           <input
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase())}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submit() } }}
             placeholder="HAVE A CODE?"
-            className="w-full pl-8 pr-3 py-2.5 bg-transparent border border-[#4A0F1C]/20 focus:border-[#C8A45A] rounded-sm font-cinzel text-[0.65rem] tracking-[0.25em] text-[#4A0F1C] placeholder:text-[#4A0F1C]/40 focus:outline-none uppercase"
+            className="w-full pl-8 pr-3 py-2.5 bg-transparent border border-[#35121C]/20 focus:border-[#A48246] rounded-sm font-cinzel text-[0.65rem] tracking-[0.25em] text-[#35121C] placeholder:text-[#35121C]/40 focus:outline-none uppercase"
             disabled={loading}
           />
         </div>
@@ -83,7 +83,7 @@ export default function CouponBox({ subtotal = 0, applied = null, onApply, onRem
           type="button"
           onClick={submit}
           disabled={loading || !code.trim()}
-          className="px-4 rounded-sm font-cinzel text-[0.6rem] tracking-[0.28em] uppercase bg-[#4A0F1C] text-[#F7F3EB] hover:bg-[#3A0B15] disabled:opacity-70 transition-colors"
+          className="px-4 rounded-sm font-cinzel text-[0.6rem] tracking-[0.28em] uppercase bg-[#35121C] text-[#F7F3EB] hover:bg-[#2C0F17] disabled:opacity-70 transition-colors"
         >
           {loading ? '…' : 'Apply'}
         </button>

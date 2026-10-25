@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Search, Package, Truck, CheckCircle2 } from 'lucide-react'
 
-import { LOGO_URL } from '@/lib/brand'
+import BrandLogo from '@/components/BrandLogo'
 
 const STEPS = [
   { key: 'PAYMENT_PENDING',  label: 'Placed' },
@@ -24,24 +24,46 @@ const ACTIVE_INDEX = (status) => {
 export default function TrackOrder() {
   const [orderId, setOrderId] = useState('')
   const [idn, setIdn] = useState('')
+  const [code, setCode] = useState('')
+  const [step, setStep] = useState('details') // details -> code
+  const [info, setInfo] = useState('')
+  const [cooldown, setCooldown] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [order, setOrder] = useState(null)
 
-  const submit = async (e) => {
-    e.preventDefault()
+  useEffect(() => {
+    if (cooldown <= 0) return
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [cooldown])
+
+  const post = async (url, body) => {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    const d = await r.json().catch(() => ({}))
+    if (!r.ok) throw new Error(d.error || 'Something went wrong. Please try again.')
+    return d
+  }
+
+  const requestCode = async (e) => {
+    e?.preventDefault()
     setError(''); setOrder(null); setLoading(true)
     try {
-      const r = await fetch('/api/orders/track', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: orderId.trim(), identifier: idn.trim() })
-      })
+      const d = await post('/api/orders/access/request', { orderNumber: orderId.trim(), contact: idn.trim() })
+      setInfo(d.message); setStep('code'); setCode(''); setCooldown(d.resendIn || 60)
+    } catch (err) { setError(err.message) } finally { setLoading(false) }
+  }
+
+  const verify = async (e) => {
+    e.preventDefault()
+    setError(''); setLoading(true)
+    try {
+      const v = await post('/api/orders/access/verify', { orderNumber: orderId.trim(), code: code.trim() })
+      const r = await fetch(`/api/orders/${v.orderId}`)
       const d = await r.json()
-      if (!r.ok) throw new Error(d.error || 'Unable to find order')
+      if (!r.ok) throw new Error(d.error || 'Unable to load order')
       setOrder(d.order)
-    } catch (err) {
-      setError(err.message)
-    } finally { setLoading(false) }
+    } catch (err) { setError(err.message) } finally { setLoading(false) }
   }
 
   const inr = new Intl.NumberFormat('en-IN')
@@ -52,7 +74,7 @@ export default function TrackOrder() {
     <main className="min-h-screen bg-luxury-ivory">
       <header className="py-6 border-b border-burgundy-ink/10">
         <div className="container flex items-center justify-center">
-          <Link href="/"><img src={LOGO_URL} alt="ARKADHATRI" className="h-14 object-contain" /></Link>
+          <Link href="/"><BrandLogo size="md" /></Link>
         </div>
       </header>
 
@@ -60,23 +82,41 @@ export default function TrackOrder() {
         <div className="text-center mb-10">
           <div className="font-cinzel text-[0.62rem] tracking-[0.35em] text-gold mb-3">— TRACK YOUR ORDER</div>
           <h1 className="font-cormorant text-4xl md:text-5xl text-burgundy-ink">Follow Your Saree</h1>
-          <p className="mt-4 font-cormorant italic text-burgundy-ink/60 text-lg max-w-xl mx-auto">Enter your order number and the email or mobile you used at checkout.</p>
+          <p className="mt-4 font-cormorant italic text-burgundy-ink/60 text-lg max-w-xl mx-auto">Enter your order number and the email you used at checkout. We will email you a 6-digit code to confirm it is you.</p>
         </div>
 
-        <form onSubmit={submit} className="max-w-xl mx-auto grid gap-4">
+        {step === 'details' ? (
+        <form onSubmit={requestCode} className="max-w-xl mx-auto grid gap-4">
           <div>
             <label className="block font-cinzel text-[0.55rem] tracking-[0.3em] uppercase text-burgundy-ink/70 mb-2">Order Number</label>
-            <input value={orderId} onChange={e => setOrderId(e.target.value)} placeholder="e.g. c4a1b2d3-..." required className="w-full bg-transparent border border-burgundy-ink/20 focus:border-gold focus:outline-none py-3 px-4 font-cormorant text-burgundy-ink rounded-sm" />
+            <input data-testid="track-order-number" value={orderId} onChange={e => setOrderId(e.target.value)} placeholder="e.g. C4A1B2D3" required className="w-full bg-transparent border border-burgundy-ink/20 focus:border-gold focus:outline-none py-3 px-4 font-cormorant text-burgundy-ink rounded-sm" />
           </div>
           <div>
-            <label className="block font-cinzel text-[0.55rem] tracking-[0.3em] uppercase text-burgundy-ink/70 mb-2">Email or Mobile</label>
-            <input value={idn} onChange={e => setIdn(e.target.value)} placeholder="you@example.com or +91…" required className="w-full bg-transparent border border-burgundy-ink/20 focus:border-gold focus:outline-none py-3 px-4 font-cormorant text-burgundy-ink rounded-sm" />
+            <label className="block font-cinzel text-[0.55rem] tracking-[0.3em] uppercase text-burgundy-ink/70 mb-2">Email used for the order</label>
+            <input data-testid="track-contact" value={idn} onChange={e => setIdn(e.target.value)} placeholder="you@example.com" required className="w-full bg-transparent border border-burgundy-ink/20 focus:border-gold focus:outline-none py-3 px-4 font-cormorant text-burgundy-ink rounded-sm" />
           </div>
           {error && <p className="font-cormorant italic text-red-700">{error}</p>}
-          <button disabled={loading} className="btn-luxury-filled disabled:opacity-60">
-            {loading ? 'Locating your order…' : 'Track Order'}
+          <button data-testid="track-send-code" disabled={loading} className="btn-luxury-filled disabled:opacity-60">
+            {loading ? 'Sending…' : 'Email Me a Code'}
           </button>
         </form>
+        ) : (
+        <form onSubmit={verify} className="max-w-xl mx-auto grid gap-4">
+          {info && <p className="font-inter text-[15px] text-burgundy-ink/80">{info}</p>}
+          <div>
+            <label className="block font-cinzel text-[0.55rem] tracking-[0.3em] uppercase text-burgundy-ink/70 mb-2">6-digit code</label>
+            <input data-testid="track-code" value={code} onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" placeholder="••••••" required className="w-full bg-transparent border border-burgundy-ink/20 focus:border-gold focus:outline-none py-3 px-4 font-inter tracking-[0.5em] text-lg text-burgundy-ink rounded-sm" />
+          </div>
+          {error && <p className="font-cormorant italic text-red-700">{error}</p>}
+          <button data-testid="track-verify" disabled={loading || code.length !== 6} className="btn-luxury-filled disabled:opacity-60">
+            {loading ? 'Checking…' : 'View My Order'}
+          </button>
+          <div className="flex justify-between font-inter text-sm text-burgundy-ink/70">
+            <button type="button" onClick={() => { setStep('details'); setError('') }} className="underline underline-offset-4 hover:text-gold">Change details</button>
+            <button type="button" data-testid="track-resend" disabled={cooldown > 0 || loading} onClick={requestCode} className="underline underline-offset-4 hover:text-gold disabled:no-underline disabled:opacity-50">{cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}</button>
+          </div>
+        </form>
+        )}
 
         {order && (
           <div className="mt-14 max-w-3xl mx-auto">

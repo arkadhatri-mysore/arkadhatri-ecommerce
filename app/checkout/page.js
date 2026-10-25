@@ -10,7 +10,7 @@ import { useStoreConfig, shippingFor, waLink } from '@/lib/store-config'
 import CouponBox from '@/components/CouponBox'
 import { trackEvent } from '@/components/Analytics'
 
-import { LOGO_URL } from '@/lib/brand'
+import BrandLogo from '@/components/BrandLogo'
 
 const FieldLabel = ({ children }) => (
   <label className="block font-cinzel text-[0.55rem] tracking-[0.3em] uppercase text-burgundy-deep/80 mb-2">{children}</label>
@@ -83,7 +83,7 @@ const CheckoutPage = () => {
       description: `Order ${order.id}`,
       order_id: payment.razorpayOrderId,
       prefill: { name: order.customer.fullName, email: order.customer.email, contact: order.customer.mobile },
-      theme: { color: '#4A0F1C' },
+      theme: { color: '#35121C' },
       timeout: 900,
       retry: { enabled: true },
       notes: { orderId: order.id },
@@ -174,7 +174,7 @@ const CheckoutPage = () => {
             <ChevronLeft size={16} strokeWidth={1.4} className="group-hover:-translate-x-1 transition-transform" />
             <span className="font-cinzel text-[0.6rem] tracking-[0.35em]">BACK TO BAG</span>
           </Link>
-          <Link href="/"><img src={LOGO_URL} alt="ARKADHATRI" className="h-12 md:h-14 object-contain" /></Link>
+          <Link href="/"><BrandLogo size="md" /></Link>
           <div className="flex items-center gap-1.5 font-cinzel text-[0.55rem] tracking-[0.35em] text-burgundy-ink/70">
             <Lock size={11} strokeWidth={1.5} /> SECURE
           </div>
@@ -224,7 +224,7 @@ const CheckoutPage = () => {
             <div>
               <div className="font-cinzel text-[0.62rem] tracking-[0.35em] text-burgundy-ink mb-5">— 03 &middot; PAYMENT</div>
               <label className="flex items-start gap-3 border border-gold/60 bg-gold/5 rounded-sm p-5 cursor-pointer">
-                  <input type="radio" name="pay" checked={form.paymentMethod === 'razorpay'} onChange={() => set('paymentMethod', 'razorpay')} className="mt-1 accent-[#C8A45A]" />
+                  <input type="radio" name="pay" checked={form.paymentMethod === 'razorpay'} onChange={() => set('paymentMethod', 'razorpay')} className="mt-1 accent-[#A48246]" />
                   <div>
                     <div className="font-cormorant text-xl text-burgundy-ink">Razorpay Secure Payment</div>
                     <div className="font-inter font-light text-burgundy-ink/60 text-[13px] mt-1">UPI, Cards, Netbanking &amp; Wallets. Payment gateway will open in a secure window.</div>

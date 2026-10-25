@@ -8,7 +8,7 @@ import { MapPin } from 'lucide-react'
 import { inr } from '@/lib/cart'
 import { firePurchaseOnce } from '@/components/Analytics'
 
-import { LOGO_URL } from '@/lib/brand'
+import BrandLogo from '@/components/BrandLogo'
 
 const STATUS_LABEL = {
   PAYMENT_PENDING:  { text: 'Payment pending confirmation',   tone: 'text-gold' },
@@ -47,19 +47,19 @@ const OrderSuccess = () => {
     <main className="min-h-screen bg-luxury-ivory">
       <header className="py-6 border-b border-burgundy-ink/10">
         <div className="container flex items-center justify-center">
-          <Link href="/"><img src={LOGO_URL} alt="ARKADHATRI" className="h-14 object-contain" /></Link>
+          <Link href="/"><BrandLogo size="md" /></Link>
         </div>
       </header>
 
       <section className="container py-16 md:py-24 text-center">
-        <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }} className={`w-20 h-20 md:w-24 md:h-24 mx-auto mb-8 rounded-full border-2 flex items-center justify-center ${isFailed ? 'border-red-500' : 'border-gold'}`} style={{ boxShadow: isFailed ? '0 20px 40px -20px rgba(239,68,68,0.3)' : '0 20px 40px -20px rgba(200,164,90,0.35)' }}>
+        <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }} className={`w-20 h-20 md:w-24 md:h-24 mx-auto mb-8 rounded-full border-2 flex items-center justify-center ${isFailed ? 'border-red-500' : 'border-gold'}`} style={{ boxShadow: isFailed ? '0 20px 40px -20px rgba(239,68,68,0.3)' : '0 20px 40px -20px rgba(164,130,70,0.35)' }}>
           {isFailed ? (
             <svg width="34" height="34" viewBox="0 0 24 24" fill="none">
               <path d="M6 6 L18 18 M18 6 L6 18" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" />
             </svg>
           ) : (
             <motion.svg width="36" height="36" viewBox="0 0 24 24" fill="none">
-              <motion.path d="M4 12 L10 18 L20 6" stroke="#C8A45A" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.7, delay: 0.3 }} />
+              <motion.path d="M4 12 L10 18 L20 6" stroke="#A48246" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.7, delay: 0.3 }} />
             </motion.svg>
           )}
         </motion.div>
@@ -129,7 +129,7 @@ const OrderSuccess = () => {
           </div>
         )}
 
-        {err && <div className="mt-10 font-cormorant italic text-burgundy-ink/70">{err}. Please write to hello@arkadhatri.com with your order details.</div>}
+        {err && <div className="mt-10 font-cormorant italic text-burgundy-ink/70">{err} You can view it any time from <Link href="/track-order" className="underline hover:text-gold">Track Order</Link> using your order number and email.</div>}
 
         <div className="mt-12 flex flex-col sm:flex-row justify-center items-center gap-4">
           <Link href="/" className="btn-luxury-filled">Continue Shopping</Link>

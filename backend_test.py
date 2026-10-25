@@ -1,539 +1,851 @@
 #!/usr/bin/env python3
 """
-Backend test for ARKADHATRI admin security + email + refund endpoints.
-Tests password management, email templates, and Razorpay refund (key-independent behavior).
+Security Regression Test - ARKADHATRI
+Scenarios: A-F (unauthorized order access, OTP, admin reset, rate limits, trusted proxy, smoke)
 """
-
 import requests
+import time
 import json
+from pymongo import MongoClient
+from uuid import uuid4
+from datetime import datetime, timedelta
+import os
 import sys
-from typing import Dict, Optional
 
-# Base URL from review request
-BASE_URL = "http://localhost:3000/api"
-
-# Admin credentials
+# Configuration
+INTERNAL_URL = "http://localhost:3000/api"
+EXTERNAL_URL = os.getenv("NEXT_PUBLIC_BASE_URL", "https://timeless-crafted-8.preview.emergentagent.com") + "/api"
+MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
+DB_NAME = os.getenv("DB_NAME", "your_database_name")
 ADMIN_EMAIL = "admin@arkadhatri.com"
 ADMIN_PASSWORD = "ArkAdmin@2025"
 
-# Test results tracking
-test_results = []
+# Test data
+TEST_EMAIL = "otp-test@example.com"
+TEST_MOBILE = "+919800000001"
 
-def log_test(name: str, passed: bool, details: str = ""):
-    """Log test result"""
-    status = "✅ PASS" if passed else "❌ FAIL"
-    print(f"{status}: {name}")
-    if details:
-        print(f"  Details: {details}")
-    test_results.append({"name": name, "passed": passed, "details": details})
+def log(msg):
+    print(f"[TEST] {msg}")
 
-def admin_login(ip_suffix: str = "1") -> Optional[str]:
-    """Login as admin and return session cookie. Use unique IP to avoid rate limiting."""
-    try:
-        headers = {"X-Forwarded-For": f"10.50.0.{ip_suffix}"}
-        resp = requests.post(
-            f"{BASE_URL}/admin/login",
-            json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
-            headers=headers,
-            timeout=10
-        )
-        if resp.status_code == 200:
-            cookie = resp.cookies.get("ark_admin")
-            if cookie:
-                return cookie
-        print(f"Login failed: {resp.status_code} - {resp.text[:200]}")
-        return None
-    except Exception as e:
-        print(f"Login error: {e}")
-        return None
+def backup_admin_data(db):
+    """Backup admin_users and admin_reset_tokens"""
+    admin_users = list(db.admin_users.find({}))
+    admin_reset_tokens = list(db.admin_reset_tokens.find({}))
+    log(f"✅ Backed up {len(admin_users)} admin_users and {len(admin_reset_tokens)} admin_reset_tokens")
+    return {"admin_users": admin_users, "admin_reset_tokens": admin_reset_tokens}
 
-def test_password_change():
-    """Test 1: Password change flow with validation and session revocation"""
-    print("\n=== TEST 1: PASSWORD CHANGE ===")
+def restore_admin_data(db, backup):
+    """Restore admin_users and admin_reset_tokens exactly"""
+    db.admin_users.delete_many({})
+    db.admin_reset_tokens.delete_many({})
+    if backup["admin_users"]:
+        db.admin_users.insert_many(backup["admin_users"])
+    if backup["admin_reset_tokens"]:
+        db.admin_reset_tokens.insert_many(backup["admin_reset_tokens"])
+    log(f"✅ Restored {len(backup['admin_users'])} admin_users and {len(backup['admin_reset_tokens'])} admin_reset_tokens")
+
+def verify_admin_login(email, password):
+    """Verify admin can login with given credentials"""
+    resp = requests.post(f"{INTERNAL_URL}/admin/login", json={"email": email, "password": password})
+    return resp.status_code == 200
+
+def create_test_order(db, order_id=None):
+    """Insert a test order directly into MongoDB"""
+    if not order_id:
+        order_id = str(uuid4())
     
-    # Get initial session
-    cookie1 = admin_login("10")
-    if not cookie1:
-        log_test("Password change - initial login", False, "Could not login")
-        return
-    log_test("Password change - initial login", True)
+    order = {
+        "id": order_id,
+        "customer": {
+            "fullName": "Test Customer",
+            "email": TEST_EMAIL,
+            "mobile": TEST_MOBILE,
+            "address1": "123 Test St",
+            "city": "Mumbai",
+            "state": "Maharashtra",
+            "pincode": "400001"
+        },
+        "items": [{
+            "sku": "TEST-SEC-001",
+            "name": "Test Saree",
+            "qty": 1,
+            "price": 5000,
+            "image": ""
+        }],
+        "total": 5000,
+        "subtotal": 5000,
+        "shipping": 0,
+        "discount": 0,
+        "status": "PAYMENT_PENDING",
+        "paymentStatus": "pending",
+        "adminNote": "INTERNAL SECRET NOTE",
+        "needsRefundReview": True,
+        "razorpayPaymentId": "pay_test",
+        "razorpayOrderId": "order_test",
+        "_id": order_id,
+        "createdAt": datetime.utcnow()
+    }
+    db.orders.insert_one(order)
+    log(f"✅ Created test order: {order_id[:8]}")
+    return order_id
+
+def cleanup_test_data(db, order_ids):
+    """Clean up test orders and related data"""
+    if order_ids:
+        db.orders.delete_many({"id": {"$in": order_ids}})
+        log(f"✅ Deleted {len(order_ids)} test orders")
     
-    # Test 1a: Wrong current password
+    # Clean up mock_outbox
+    db.mock_outbox.delete_many({"to": TEST_EMAIL})
+    log("✅ Cleaned up mock_outbox")
+    
+    # Clean up order_otps
+    db.order_otps.delete_many({})
+    log("✅ Cleaned up order_otps")
+
+def cleanup_rate_limits(db, patterns):
+    """Clean up rate limit keys matching patterns"""
+    for pattern in patterns:
+        db.rate_limits.delete_many({"_id": {"$regex": pattern}})
+    log(f"✅ Cleaned up rate_limits for {len(patterns)} patterns")
+
+def scenario_a_unauthorized_order_access(db):
+    """A. Unauthorized order access"""
+    log("\n=== SCENARIO A: Unauthorized Order Access ===")
+    
+    # Create two test orders
+    order_a_id = create_test_order(db)
+    order_b_id = create_test_order(db)
+    
     try:
-        resp = requests.post(
-            f"{BASE_URL}/admin/password",
-            json={"currentPassword": "WrongPassword123", "newPassword": "TempArk2026Secure"},
-            cookies={"ark_admin": cookie1},
-            headers={"X-Forwarded-For": "10.50.0.11"},
-            timeout=10
-        )
-        passed = resp.status_code == 400 and "incorrect" in resp.text.lower()
-        log_test("Password change - wrong current password returns 400", passed, 
-                f"Status: {resp.status_code}, Body: {resp.text[:100]}")
-    except Exception as e:
-        log_test("Password change - wrong current password returns 400", False, str(e))
-    
-    # Test 1b: Weak passwords (short, no number, no uppercase)
-    weak_passwords = [
-        ("short", "Short password"),
-        ("nouppercase123", "No uppercase"),
-        ("NOLOWERCASE123", "No lowercase"),
-        ("NoNumbers", "No numbers")
-    ]
-    
-    for weak_pw, desc in weak_passwords:
-        try:
-            resp = requests.post(
-                f"{BASE_URL}/admin/password",
-                json={"currentPassword": ADMIN_PASSWORD, "newPassword": weak_pw},
-                cookies={"ark_admin": cookie1},
-                headers={"X-Forwarded-For": "10.50.0.12"},
-                timeout=10
-            )
-            passed = resp.status_code == 400
-            log_test(f"Password change - weak password rejected ({desc})", passed,
-                    f"Status: {resp.status_code}")
-        except Exception as e:
-            log_test(f"Password change - weak password rejected ({desc})", False, str(e))
-    
-    # Test 1c: Success with strong temp password
-    temp_password = "TempArk2026Secure"
-    try:
-        resp = requests.post(
-            f"{BASE_URL}/admin/password",
-            json={"currentPassword": ADMIN_PASSWORD, "newPassword": temp_password},
-            cookies={"ark_admin": cookie1},
-            headers={"X-Forwarded-For": "10.50.0.13"},
-            timeout=10
-        )
-        passed = resp.status_code == 200
-        new_cookie = resp.cookies.get("ark_admin")
-        log_test("Password change - success with strong password", passed,
-                f"Status: {resp.status_code}, New cookie: {bool(new_cookie)}")
+        # A1: GET /orders/<id> without cookie -> 401 VERIFY_REQUIRED, no PII
+        log("A1: GET /orders/<id> without cookie")
+        resp = requests.get(f"{INTERNAL_URL}/orders/{order_a_id}")
+        assert resp.status_code == 401, f"Expected 401, got {resp.status_code}"
+        data = resp.json()
+        assert data.get("code") == "VERIFY_REQUIRED", f"Expected VERIFY_REQUIRED, got {data.get('code')}"
+        assert "email" not in str(data).lower() or TEST_EMAIL not in str(data), "PII leaked in 401 response"
+        log("✅ A1 PASS: 401 VERIFY_REQUIRED without cookie, no PII")
         
-        if passed and new_cookie:
-            # Test 1d: Old session should now get 401
-            try:
-                resp = requests.get(
-                    f"{BASE_URL}/admin/me",
-                    cookies={"ark_admin": cookie1},
-                    timeout=10
-                )
-                passed = resp.status_code == 401
-                log_test("Password change - old session revoked (401)", passed,
-                        f"Status: {resp.status_code}")
-            except Exception as e:
-                log_test("Password change - old session revoked (401)", False, str(e))
-            
-            # Test 1e: Login with old password should fail
-            try:
-                resp = requests.post(
-                    f"{BASE_URL}/admin/login",
-                    json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
-                    headers={"X-Forwarded-For": "10.50.0.14"},
-                    timeout=10
-                )
-                passed = resp.status_code == 401
-                log_test("Password change - old password rejected", passed,
-                        f"Status: {resp.status_code}")
-            except Exception as e:
-                log_test("Password change - old password rejected", False, str(e))
-            
-            # Test 1f: Login with new password should work
-            try:
-                resp = requests.post(
-                    f"{BASE_URL}/admin/login",
-                    json={"email": ADMIN_EMAIL, "password": temp_password},
-                    headers={"X-Forwarded-For": "10.50.0.15"},
-                    timeout=10
-                )
-                passed = resp.status_code == 200
-                restore_cookie = resp.cookies.get("ark_admin")
-                log_test("Password change - new password works", passed,
-                        f"Status: {resp.status_code}")
-                
-                # RESTORE: Change password back to original
-                if passed and restore_cookie:
-                    try:
-                        resp = requests.post(
-                            f"{BASE_URL}/admin/password",
-                            json={"currentPassword": temp_password, "newPassword": ADMIN_PASSWORD},
-                            cookies={"ark_admin": restore_cookie},
-                            headers={"X-Forwarded-For": "10.50.0.16"},
-                            timeout=10
-                        )
-                        passed = resp.status_code == 200
-                        log_test("Password RESTORE - back to ArkAdmin@2025", passed,
-                                f"Status: {resp.status_code}")
-                        
-                        # Verify original password works
-                        if passed:
-                            resp = requests.post(
-                                f"{BASE_URL}/admin/login",
-                                json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
-                                headers={"X-Forwarded-For": "10.50.0.17"},
-                                timeout=10
-                            )
-                            passed = resp.status_code == 200
-                            log_test("Password RESTORE - original password verified", passed,
-                                    f"Status: {resp.status_code}")
-                    except Exception as e:
-                        log_test("Password RESTORE - back to ArkAdmin@2025", False, str(e))
-            except Exception as e:
-                log_test("Password change - new password works", False, str(e))
-    except Exception as e:
-        log_test("Password change - success with strong password", False, str(e))
-
-def test_forgot_reset():
-    """Test 2: Forgot/reset password flow"""
-    print("\n=== TEST 2: FORGOT/RESET PASSWORD ===")
-    
-    # Test 2a: Forgot with admin email -> 503 (SMTP missing)
-    try:
-        resp = requests.post(
-            f"{BASE_URL}/admin/password/forgot",
-            json={"email": ADMIN_EMAIL},
-            headers={"X-Forwarded-For": "10.50.0.20"},
-            timeout=10
-        )
-        passed = resp.status_code == 503 and "email" in resp.text.lower()
-        log_test("Forgot password - admin email returns 503 (SMTP missing)", passed,
-                f"Status: {resp.status_code}, Body: {resp.text[:150]}")
-    except Exception as e:
-        log_test("Forgot password - admin email returns 503 (SMTP missing)", False, str(e))
-    
-    # Test 2b: Forgot with other email -> 200 generic
-    try:
-        resp = requests.post(
-            f"{BASE_URL}/admin/password/forgot",
-            json={"email": "other@example.com"},
-            headers={"X-Forwarded-For": "10.50.0.21"},
-            timeout=10
-        )
-        passed = resp.status_code == 200
-        log_test("Forgot password - other email returns 200 generic", passed,
-                f"Status: {resp.status_code}")
-    except Exception as e:
-        log_test("Forgot password - other email returns 200 generic", False, str(e))
-    
-    # Test 2c: Rate limiting - 4th request within window -> 429
-    try:
-        # Use same IP for rate limit test
-        ip = "10.50.0.22"
-        for i in range(3):
-            requests.post(
-                f"{BASE_URL}/admin/password/forgot",
-                json={"email": "test@example.com"},
-                headers={"X-Forwarded-For": ip},
-                timeout=10
-            )
+        # A2: POST /orders/track without session -> 401
+        log("A2: POST /orders/track without session")
+        resp = requests.post(f"{INTERNAL_URL}/orders/track", json={"orderId": order_a_id})
+        assert resp.status_code == 401, f"Expected 401, got {resp.status_code}"
+        log("✅ A2 PASS: POST /orders/track returns 401 without session")
         
-        # 4th request should be rate limited
-        resp = requests.post(
-            f"{BASE_URL}/admin/password/forgot",
-            json={"email": "test@example.com"},
-            headers={"X-Forwarded-For": ip},
-            timeout=10
-        )
-        passed = resp.status_code == 429
-        log_test("Forgot password - 4th request returns 429 (rate limited)", passed,
-                f"Status: {resp.status_code}")
-    except Exception as e:
-        log_test("Forgot password - 4th request returns 429 (rate limited)", False, str(e))
-    
-    # Test 2d: Reset with invalid token -> 400
-    try:
-        resp = requests.post(
-            f"{BASE_URL}/admin/password/reset",
-            json={"token": "invalid-token-12345", "newPassword": "ValidPassword123"},
-            headers={"X-Forwarded-For": "10.50.0.23"},
-            timeout=10
-        )
-        passed = resp.status_code == 400 and ("invalid" in resp.text.lower() or "expired" in resp.text.lower())
-        log_test("Reset password - invalid token returns 400", passed,
-                f"Status: {resp.status_code}, Body: {resp.text[:100]}")
-    except Exception as e:
-        log_test("Reset password - invalid token returns 400", False, str(e))
-    
-    # Test 2e: Reset with weak password -> 400
-    try:
-        resp = requests.post(
-            f"{BASE_URL}/admin/password/reset",
-            json={"token": "some-token", "newPassword": "weak"},
-            headers={"X-Forwarded-For": "10.50.0.24"},
-            timeout=10
-        )
-        passed = resp.status_code == 400
-        log_test("Reset password - weak password returns 400", passed,
-                f"Status: {resp.status_code}")
-    except Exception as e:
-        log_test("Reset password - weak password returns 400", False, str(e))
+        # A3: POST /payments/razorpay/init without session -> 401
+        log("A3: POST /payments/razorpay/init without session")
+        resp = requests.post(f"{INTERNAL_URL}/payments/razorpay/init", json={"orderId": order_a_id})
+        assert resp.status_code == 401, f"Expected 401, got {resp.status_code}"
+        log("✅ A3 PASS: POST /payments/razorpay/init returns 401 without session")
+        
+        # A4: POST /payments/razorpay/verify without session -> 401
+        log("A4: POST /payments/razorpay/verify without session")
+        resp = requests.post(f"{INTERNAL_URL}/payments/razorpay/verify", json={"orderId": order_a_id})
+        assert resp.status_code == 401, f"Expected 401, got {resp.status_code}"
+        log("✅ A4 PASS: POST /payments/razorpay/verify returns 401 without session")
+        
+        # A5: Verify order A, then try to access order B -> 401 (session scoped to one order)
+        log("A5: Verify order A, then try to access order B")
+        # Request OTP for order A
+        resp = requests.post(f"{INTERNAL_URL}/orders/access/request", json={
+            "orderNumber": order_a_id[:8],
+            "contact": TEST_EMAIL
+        })
+        assert resp.status_code == 200, f"OTP request failed: {resp.status_code}"
+        time.sleep(1)
+        
+        # Get OTP from mock_outbox
+        otp_doc = db.mock_outbox.find_one({"to": TEST_EMAIL}, sort=[("createdAt", -1)])
+        assert otp_doc, "No OTP email found in mock_outbox"
+        otp_code = None
+        for match in [otp_doc.get("subject", ""), otp_doc.get("html", "")]:
+            import re
+            codes = re.findall(r'\b\d{6}\b', str(match))
+            if codes:
+                otp_code = codes[0]
+                break
+        assert otp_code, "Could not extract OTP code from email"
+        
+        # Verify OTP for order A
+        resp = requests.post(f"{INTERNAL_URL}/orders/access/verify", json={
+            "orderNumber": order_a_id[:8],
+            "code": otp_code
+        })
+        assert resp.status_code == 200, f"OTP verify failed: {resp.status_code}"
+        cookies = resp.cookies
+        
+        # Try to access order B with order A's session
+        resp = requests.get(f"{INTERNAL_URL}/orders/{order_b_id}", cookies=cookies)
+        assert resp.status_code == 401, f"Expected 401 for cross-order access, got {resp.status_code}"
+        log("✅ A5 PASS: Session scoped to one order (cannot access order B with order A session)")
+        
+        # A6: Verified response must NOT contain sensitive fields
+        log("A6: Verified response must NOT contain sensitive fields")
+        resp = requests.get(f"{INTERNAL_URL}/orders/{order_a_id}", cookies=cookies)
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        data = resp.json()
+        order_data = data.get("order", {})
+        
+        # Check that sensitive fields are NOT present
+        sensitive_fields = ["adminNote", "needsRefundReview", "stockConflict", "razorpayPaymentId", "razorpayOrderId", "_id"]
+        for field in sensitive_fields:
+            assert field not in order_data, f"Sensitive field '{field}' leaked in response"
+        log("✅ A6 PASS: Verified response does NOT contain sensitive fields")
+        
+        log("✅ SCENARIO A: ALL PASS")
+        return True
+        
+    finally:
+        cleanup_test_data(db, [order_a_id, order_b_id])
 
-def test_email_endpoints():
-    """Test 3: Email status, preview, and test endpoints"""
-    print("\n=== TEST 3: EMAIL ENDPOINTS ===")
+def scenario_b_otp(db):
+    """B. OTP (email-based order access)"""
+    log("\n=== SCENARIO B: OTP ===")
     
-    # Get admin session
-    cookie = admin_login("30")
-    if not cookie:
-        log_test("Email endpoints - admin login", False, "Could not login")
-        return
+    order_id = create_test_order(db)
     
-    # Test 3a: GET /admin/email/status without auth -> 401
     try:
-        resp = requests.get(f"{BASE_URL}/admin/email/status", timeout=10)
-        passed = resp.status_code == 401
-        log_test("Email status - 401 without cookie", passed,
-                f"Status: {resp.status_code}")
-    except Exception as e:
-        log_test("Email status - 401 without cookie", False, str(e))
-    
-    # Test 3b: GET /admin/email/status with auth -> configured:false + 8 templates
-    try:
-        resp = requests.get(
-            f"{BASE_URL}/admin/email/status",
-            cookies={"ark_admin": cookie},
-            timeout=10
+        # B1: Request OTP with matching email -> generic response
+        log("B1: Request OTP with matching email")
+        resp = requests.post(f"{INTERNAL_URL}/orders/access/request", json={
+            "orderNumber": order_id[:8],
+            "contact": TEST_EMAIL
+        })
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        data = resp.json()
+        assert data.get("ok") == True, "Expected ok:true"
+        assert "6-digit code" in data.get("message", ""), "Generic message not returned"
+        log("✅ B1 PASS: Generic response for matching email")
+        
+        time.sleep(1)
+        
+        # B2: Check OTP in mock_outbox (6 digits)
+        log("B2: Check OTP in mock_outbox")
+        otp_doc = db.mock_outbox.find_one({"to": TEST_EMAIL}, sort=[("createdAt", -1)])
+        assert otp_doc, "No OTP email found in mock_outbox"
+        import re
+        otp_code = None
+        for match in [otp_doc.get("subject", ""), otp_doc.get("html", "")]:
+            codes = re.findall(r'\b\d{6}\b', str(match))
+            if codes:
+                otp_code = codes[0]
+                break
+        assert otp_code and len(otp_code) == 6, f"Invalid OTP code: {otp_code}"
+        log(f"✅ B2 PASS: OTP code found in mock_outbox (6 digits)")
+        
+        # B3: Check order_otps stores only codeHash (no plain code)
+        log("B3: Check order_otps stores only codeHash")
+        otp_record = db.order_otps.find_one({"_id": order_id})
+        assert otp_record, "No OTP record found in order_otps"
+        assert "codeHash" in otp_record, "codeHash not found in order_otps"
+        assert otp_code not in str(otp_record), "Plain OTP code leaked in order_otps"
+        log("✅ B3 PASS: order_otps stores only codeHash (no plain code)")
+        
+        # B4: Verify OTP -> 200 + Set-Cookie ark_order (HttpOnly)
+        log("B4: Verify OTP")
+        resp = requests.post(f"{INTERNAL_URL}/orders/access/verify", json={
+            "orderNumber": order_id[:8],
+            "code": otp_code
+        })
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        assert "ark_order" in resp.headers.get("Set-Cookie", ""), "ark_order cookie not set"
+        assert "HttpOnly" in resp.headers.get("Set-Cookie", ""), "HttpOnly not set on cookie"
+        log("✅ B4 PASS: OTP verify returns 200 + Set-Cookie ark_order (HttpOnly)")
+        
+        # B5: Reuse same code -> 400
+        log("B5: Reuse same code")
+        resp = requests.post(f"{INTERNAL_URL}/orders/access/verify", json={
+            "orderNumber": order_id[:8],
+            "code": otp_code
+        })
+        assert resp.status_code == 400, f"Expected 400 for reused code, got {resp.status_code}"
+        log("✅ B5 PASS: Reused code returns 400")
+        
+        # B6: Wrong code 5 times -> then even correct code fails
+        log("B6: Wrong code 5 times -> attempt limit")
+        # Request new OTP
+        time.sleep(2)  # Wait for cooldown
+        resp = requests.post(f"{INTERNAL_URL}/orders/access/request", json={
+            "orderNumber": order_id[:8],
+            "contact": TEST_EMAIL
+        })
+        assert resp.status_code == 200, f"OTP request failed: {resp.status_code}"
+        time.sleep(1)
+        
+        # Get new OTP
+        otp_doc = db.mock_outbox.find_one({"to": TEST_EMAIL}, sort=[("createdAt", -1)])
+        new_otp_code = None
+        for match in [otp_doc.get("subject", ""), otp_doc.get("html", "")]:
+            codes = re.findall(r'\b\d{6}\b', str(match))
+            if codes:
+                new_otp_code = codes[0]
+                break
+        
+        # Try wrong code 5 times
+        for i in range(5):
+            resp = requests.post(f"{INTERNAL_URL}/orders/access/verify", json={
+                "orderNumber": order_id[:8],
+                "code": "000000"
+            })
+            log(f"  Wrong attempt {i+1}/5: {resp.status_code}")
+        
+        # Now try correct code -> should fail due to attempt limit
+        resp = requests.post(f"{INTERNAL_URL}/orders/access/verify", json={
+            "orderNumber": order_id[:8],
+            "code": new_otp_code
+        })
+        assert resp.status_code == 400, f"Expected 400 after 5 wrong attempts, got {resp.status_code}"
+        log("✅ B6 PASS: Correct code fails after 5 wrong attempts")
+        
+        # B7: Resend within 60s -> no new mail (cooldown)
+        log("B7: Resend within 60s -> cooldown")
+        # Request OTP again immediately
+        resp = requests.post(f"{INTERNAL_URL}/orders/access/request", json={
+            "orderNumber": order_id[:8],
+            "contact": TEST_EMAIL
+        })
+        assert resp.status_code == 200, "Expected 200 (generic response)"
+        
+        # Check that no new email was sent (count should be same)
+        mail_count_before = db.mock_outbox.count_documents({"to": TEST_EMAIL})
+        time.sleep(1)
+        resp = requests.post(f"{INTERNAL_URL}/orders/access/request", json={
+            "orderNumber": order_id[:8],
+            "contact": TEST_EMAIL
+        })
+        mail_count_after = db.mock_outbox.count_documents({"to": TEST_EMAIL})
+        assert mail_count_after == mail_count_before, "New email sent during cooldown"
+        log("✅ B7 PASS: No new mail sent during 60s cooldown")
+        
+        # B8: After 60s (or set lastSentAt back) -> new code works, old doesn't
+        log("B8: After cooldown -> new code works, old doesn't")
+        # Clean up rate limits to avoid 429
+        cleanup_rate_limits(db, ["^otp-send:", "^otp-verify:"])
+        
+        # Set lastSentAt back in DB to simulate 60s passing
+        db.order_otps.update_one(
+            {"_id": order_id},
+            {"$set": {"lastSentAt": datetime.utcnow() - timedelta(seconds=61), "attempts": 0}}
         )
-        passed = resp.status_code == 200
-        if passed:
-            data = resp.json()
-            configured = data.get("configured", True)
-            templates = data.get("templates", [])
-            passed = configured == False and len(templates) == 8
-            log_test("Email status - returns configured:false + 8 templates", passed,
-                    f"configured={configured}, templates={len(templates)}")
-        else:
-            log_test("Email status - returns configured:false + 8 templates", False,
-                    f"Status: {resp.status_code}")
-    except Exception as e:
-        log_test("Email status - returns configured:false + 8 templates", False, str(e))
+        
+        # Request new OTP
+        resp = requests.post(f"{INTERNAL_URL}/orders/access/request", json={
+            "orderNumber": order_id[:8],
+            "contact": TEST_EMAIL
+        })
+        assert resp.status_code == 200, f"OTP request failed: {resp.status_code}"
+        time.sleep(1)
+        
+        # Get newest OTP
+        otp_doc = db.mock_outbox.find_one({"to": TEST_EMAIL}, sort=[("createdAt", -1)])
+        newest_otp_code = None
+        for match in [otp_doc.get("subject", ""), otp_doc.get("html", "")]:
+            codes = re.findall(r'\b\d{6}\b', str(match))
+            if codes:
+                newest_otp_code = codes[0]
+                break
+        
+        # Old code should not work
+        if new_otp_code != newest_otp_code:
+            resp = requests.post(f"{INTERNAL_URL}/orders/access/verify", json={
+                "orderNumber": order_id[:8],
+                "code": new_otp_code
+            })
+            assert resp.status_code == 400, f"Old code should fail, got {resp.status_code}"
+            log("  ✓ Old code rejected")
+        
+        # New code should work
+        resp = requests.post(f"{INTERNAL_URL}/orders/access/verify", json={
+            "orderNumber": order_id[:8],
+            "code": newest_otp_code
+        })
+        assert resp.status_code == 200, f"New code should work, got {resp.status_code}"
+        log("✅ B8 PASS: After cooldown, new code works and old code doesn't")
+        
+        # B9: Expiry test
+        log("B9: Expired code rejected")
+        # Clean up rate limits
+        cleanup_rate_limits(db, ["^otp-send:", "^otp-verify:"])
+        
+        # Request new OTP
+        time.sleep(2)
+        resp = requests.post(f"{INTERNAL_URL}/orders/access/request", json={
+            "orderNumber": order_id[:8],
+            "contact": TEST_EMAIL
+        })
+        time.sleep(1)
+        
+        # Get OTP
+        otp_doc = db.mock_outbox.find_one({"to": TEST_EMAIL}, sort=[("createdAt", -1)])
+        expired_otp_code = None
+        for match in [otp_doc.get("subject", ""), otp_doc.get("html", "")]:
+            codes = re.findall(r'\b\d{6}\b', str(match))
+            if codes:
+                expired_otp_code = codes[0]
+                break
+        
+        # Set expiresAt in past
+        db.order_otps.update_one(
+            {"_id": order_id},
+            {"$set": {"expiresAt": datetime.utcnow() - timedelta(seconds=1)}}
+        )
+        
+        # Try to verify expired code
+        resp = requests.post(f"{INTERNAL_URL}/orders/access/verify", json={
+            "orderNumber": order_id[:8],
+            "code": expired_otp_code
+        })
+        assert resp.status_code == 400, f"Expected 400 for expired code, got {resp.status_code}"
+        log("✅ B9 PASS: Expired code rejected")
+        
+        # B10: Phone contact -> 503 SMS_UNAVAILABLE
+        log("B10: Phone contact -> 503 SMS_UNAVAILABLE")
+        resp = requests.post(f"{INTERNAL_URL}/orders/access/request", json={
+            "orderNumber": order_id[:8],
+            "contact": TEST_MOBILE
+        })
+        assert resp.status_code == 503, f"Expected 503 for phone, got {resp.status_code}"
+        data = resp.json()
+        assert data.get("code") == "SMS_UNAVAILABLE", f"Expected SMS_UNAVAILABLE, got {data.get('code')}"
+        log("✅ B10 PASS: Phone contact returns 503 SMS_UNAVAILABLE")
+        
+        # B11: Request with non-matching email -> generic response, no mail
+        log("B11: Non-matching email -> generic response, no mail")
+        mail_count_before = db.mock_outbox.count_documents({})
+        resp = requests.post(f"{INTERNAL_URL}/orders/access/request", json={
+            "orderNumber": order_id[:8],
+            "contact": "wrong@example.com"
+        })
+        assert resp.status_code == 200, f"Expected 200 (generic), got {resp.status_code}"
+        time.sleep(1)
+        mail_count_after = db.mock_outbox.count_documents({})
+        assert mail_count_after == mail_count_before, "Email sent for non-matching contact"
+        log("✅ B11 PASS: Non-matching email returns generic response, no mail sent")
+        
+        log("✅ SCENARIO B: ALL PASS")
+        return True
+        
+    finally:
+        cleanup_test_data(db, [order_id])
+
+def scenario_c_admin_reset(db):
+    """C. Admin reset"""
+    log("\n=== SCENARIO C: Admin Reset ===")
     
-    # Test 3c: GET /admin/email/preview/<template> for each of 8 templates
-    templates = [
-        "order-confirmation", "payment-receipt", "payment-failed",
-        "order-shipped", "order-delivered", "refund-initiated",
-        "refund-processed", "admin-password-reset"
-    ]
+    # Clean up rate limits first (including account-level limits)
+    cleanup_rate_limits(db, [
+        "^admin-login:ip:",
+        "^admin-login:acct:",
+        "^admin-forgot:ip:",
+        "^admin-forgot:acct",
+        "^admin-reset:ip:",
+        "^admin-pw:"
+    ])
     
-    for template in templates:
-        try:
-            resp = requests.get(
-                f"{BASE_URL}/admin/email/preview/{template}",
-                cookies={"ark_admin": cookie},
-                timeout=10
+    # Backup admin data
+    backup = backup_admin_data(db)
+    
+    try:
+        # C1: Login first to get session S1
+        log("C1: Login to get session S1")
+        resp = requests.post(f"{INTERNAL_URL}/admin/login", json={
+            "email": ADMIN_EMAIL,
+            "password": ADMIN_PASSWORD
+        })
+        assert resp.status_code == 200, f"Admin login failed: {resp.status_code}"
+        s1_cookies = resp.cookies
+        log("✅ C1 PASS: Admin login successful, session S1 obtained")
+        
+        # C2: POST /admin/password/forgot with wrong email -> 200 generic
+        log("C2: Forgot password with wrong email")
+        resp = requests.post(f"{INTERNAL_URL}/admin/password/forgot", json={
+            "email": "wrong@example.com"
+        })
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        data = resp.json()
+        assert data.get("ok") == True, "Expected ok:true"
+        log("✅ C2 PASS: Wrong email returns 200 generic response")
+        
+        # C3: POST /admin/password/forgot with correct email -> 200 generic, mail inserted
+        log("C3: Forgot password with correct email")
+        mail_count_before = db.mock_outbox.count_documents({"to": ADMIN_EMAIL})
+        resp = requests.post(f"{INTERNAL_URL}/admin/password/forgot", json={
+            "email": ADMIN_EMAIL
+        })
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        time.sleep(1)
+        mail_count_after = db.mock_outbox.count_documents({"to": ADMIN_EMAIL})
+        assert mail_count_after > mail_count_before, "No reset email sent"
+        log("✅ C3 PASS: Correct email returns 200 generic, reset email sent")
+        
+        # C4: Extract token from email
+        log("C4: Extract reset token from email")
+        reset_email = db.mock_outbox.find_one({"to": ADMIN_EMAIL}, sort=[("createdAt", -1)])
+        assert reset_email, "No reset email found"
+        import re
+        token_match = re.search(r'/admin/reset-password\?token=([^"\s]+)', reset_email.get("html", ""))
+        assert token_match, "Reset token not found in email"
+        reset_token = token_match.group(1)
+        log(f"✅ C4 PASS: Reset token extracted")
+        
+        # C5: Check admin_reset_tokens stores tokenHash only
+        log("C5: Check admin_reset_tokens stores tokenHash only")
+        token_record = db.admin_reset_tokens.find_one({})
+        assert token_record, "No token record found"
+        assert "tokenHash" in token_record, "tokenHash not found"
+        assert reset_token not in str(token_record), "Plain token leaked in database"
+        log("✅ C5 PASS: admin_reset_tokens stores tokenHash only")
+        
+        # C6: POST /admin/password/reset with token -> 200
+        log("C6: Reset password with token")
+        new_password = "TempReset#2026x"
+        resp = requests.post(f"{INTERNAL_URL}/admin/password/reset", json={
+            "token": reset_token,
+            "newPassword": new_password
+        })
+        assert resp.status_code == 200, f"Password reset failed: {resp.status_code}"
+        log("✅ C6 PASS: Password reset successful")
+        
+        # C7: Reuse same token -> 400
+        log("C7: Reuse same token")
+        resp = requests.post(f"{INTERNAL_URL}/admin/password/reset", json={
+            "token": reset_token,
+            "newPassword": "AnotherPassword123"
+        })
+        assert resp.status_code == 400, f"Expected 400 for reused token, got {resp.status_code}"
+        log("✅ C7 PASS: Reused token returns 400")
+        
+        # C8: S1 cookie on GET /admin/me -> 401 (sessions invalidated)
+        log("C8: Old session S1 invalidated")
+        resp = requests.get(f"{INTERNAL_URL}/admin/me", cookies=s1_cookies)
+        assert resp.status_code == 401, f"Expected 401 for old session, got {resp.status_code}"
+        log("✅ C8 PASS: Old session S1 invalidated after password reset")
+        
+        # C9: Check notification mail "password was reset"
+        log("C9: Check notification email")
+        time.sleep(1)
+        notification_email = db.mock_outbox.find_one(
+            {"to": ADMIN_EMAIL, "subject": {"$regex": "password", "$options": "i"}},
+            sort=[("createdAt", -1)]
+        )
+        assert notification_email, "No password reset notification email found"
+        log("✅ C9 PASS: Password reset notification email sent")
+        
+        # C10: Expired token test
+        log("C10: Expired token rejected")
+        # Request another reset
+        resp = requests.post(f"{INTERNAL_URL}/admin/password/forgot", json={
+            "email": ADMIN_EMAIL
+        })
+        time.sleep(1)
+        
+        # Get new token
+        reset_email = db.mock_outbox.find_one({"to": ADMIN_EMAIL}, sort=[("createdAt", -1)])
+        token_match = re.search(r'/admin/reset-password\?token=([^"\s]+)', reset_email.get("html", ""))
+        expired_token = token_match.group(1) if token_match else None
+        
+        # Set expiresAt in past
+        db.admin_reset_tokens.update_many({}, {"$set": {"expiresAt": datetime.utcnow() - timedelta(seconds=1)}})
+        
+        # Try to use expired token
+        resp = requests.post(f"{INTERNAL_URL}/admin/password/reset", json={
+            "token": expired_token,
+            "newPassword": "AnotherPassword123"
+        })
+        assert resp.status_code == 400, f"Expected 400 for expired token, got {resp.status_code}"
+        log("✅ C10 PASS: Expired token rejected")
+        
+        # C11: Change password POST /admin/password requires correct currentPassword
+        log("C11: Change password requires correct currentPassword")
+        # Login with new password
+        resp = requests.post(f"{INTERNAL_URL}/admin/login", json={
+            "email": ADMIN_EMAIL,
+            "password": new_password
+        })
+        assert resp.status_code == 200, f"Login with new password failed: {resp.status_code}"
+        new_cookies = resp.cookies
+        
+        # Try to change password with wrong current password
+        resp = requests.post(f"{INTERNAL_URL}/admin/password", 
+            json={
+                "currentPassword": "WrongPassword123",
+                "newPassword": "AnotherPassword123"
+            },
+            cookies=new_cookies
+        )
+        assert resp.status_code == 400, f"Expected 400 for wrong current password, got {resp.status_code}"
+        log("✅ C11 PASS: Wrong current password returns 400")
+        
+        log("✅ SCENARIO C: ALL PASS")
+        return True
+        
+    finally:
+        # CRITICAL: Restore admin data
+        restore_admin_data(db, backup)
+        
+        # Verify original password works
+        log("Verifying original password works after restore...")
+        assert verify_admin_login(ADMIN_EMAIL, ADMIN_PASSWORD), "CRITICAL: Original password does not work after restore!"
+        log("✅ CRITICAL: Original admin password verified working after restore")
+        
+        # Clean up mock_outbox
+        db.mock_outbox.delete_many({"to": ADMIN_EMAIL})
+
+def scenario_d_rate_limits(db):
+    """D. Rate limits"""
+    log("\n=== SCENARIO D: Rate Limits ===")
+    
+    # Clean up any existing rate limits first
+    cleanup_rate_limits(db, [
+        "^admin-login:ip:",
+        "^otp-send:",
+        "^otp-verify:"
+    ])
+    
+    try:
+        # D1: Admin login wrong password repeatedly -> 429 after 8 per IP
+        log("D1: Admin login rate limit (8 per IP)")
+        ip = "192.168.1.100"
+        for i in range(9):
+            resp = requests.post(f"{INTERNAL_URL}/admin/login", 
+                json={"email": ADMIN_EMAIL, "password": "WrongPassword123"},
+                headers={"X-Forwarded-For": ip}
             )
-            passed = resp.status_code == 200 and resp.headers.get("content-type", "").startswith("text/html")
-            if passed:
-                html = resp.text
-                passed = "ARKADHATRI" in html
-            log_test(f"Email preview - {template} returns 200 text/html with ARKADHATRI", passed,
-                    f"Status: {resp.status_code}, Has ARKADHATRI: {'ARKADHATRI' in resp.text if resp.status_code == 200 else False}")
-        except Exception as e:
-            log_test(f"Email preview - {template} returns 200 text/html with ARKADHATRI", False, str(e))
-    
-    # Test 3d: GET /admin/email/preview/unknown -> 404
-    try:
-        resp = requests.get(
-            f"{BASE_URL}/admin/email/preview/unknown-template",
-            cookies={"ark_admin": cookie},
-            timeout=10
-        )
-        passed = resp.status_code == 404
-        log_test("Email preview - unknown template returns 404", passed,
-                f"Status: {resp.status_code}")
-    except Exception as e:
-        log_test("Email preview - unknown template returns 404", False, str(e))
-    
-    # Test 3e: POST /admin/email/test -> 503 (SMTP missing)
-    try:
-        resp = requests.post(
-            f"{BASE_URL}/admin/email/test",
-            json={"template": "order-confirmation"},
-            cookies={"ark_admin": cookie},
-            timeout=10
-        )
-        passed = resp.status_code == 503 and "not configured" in resp.text.lower()
-        log_test("Email test - returns 503 (SMTP missing)", passed,
-                f"Status: {resp.status_code}, Body: {resp.text[:100]}")
-    except Exception as e:
-        log_test("Email test - returns 503 (SMTP missing)", False, str(e))
-    
-    # Test 3f: POST /admin/email/test without auth -> 401
-    try:
-        resp = requests.post(
-            f"{BASE_URL}/admin/email/test",
-            json={"template": "order-confirmation"},
-            timeout=10
-        )
-        passed = resp.status_code == 401
-        log_test("Email test - 401 without cookie", passed,
-                f"Status: {resp.status_code}")
-    except Exception as e:
-        log_test("Email test - 401 without cookie", False, str(e))
-
-def test_refund_endpoint():
-    """Test 4: Refund endpoint"""
-    print("\n=== TEST 4: REFUND ENDPOINT ===")
-    
-    # Get admin session
-    cookie = admin_login("40")
-    if not cookie:
-        log_test("Refund - admin login", False, "Could not login")
-        return
-    
-    # Test 4a: POST /admin/orders/:id/refund without auth -> 401
-    try:
-        resp = requests.post(
-            f"{BASE_URL}/admin/orders/nonexistent-id/refund",
-            json={"amount": 100},
-            timeout=10
-        )
-        passed = resp.status_code == 401
-        log_test("Refund - 401 without cookie", passed,
-                f"Status: {resp.status_code}")
-    except Exception as e:
-        log_test("Refund - 401 without cookie", False, str(e))
-    
-    # Test 4b: POST /admin/orders/nonexistent/refund -> 404
-    try:
-        resp = requests.post(
-            f"{BASE_URL}/admin/orders/nonexistent-order-id/refund",
-            json={"amount": 100},
-            cookies={"ark_admin": cookie},
-            timeout=10
-        )
-        passed = resp.status_code == 404
-        log_test("Refund - nonexistent order returns 404", passed,
-                f"Status: {resp.status_code}")
-    except Exception as e:
-        log_test("Refund - nonexistent order returns 404", False, str(e))
-    
-    # Test 4c: Get an existing order and try refund -> 503 (Razorpay not configured)
-    try:
-        # Get list of orders
-        resp = requests.get(
-            f"{BASE_URL}/admin/orders",
-            cookies={"ark_admin": cookie},
-            timeout=10
-        )
-        if resp.status_code == 200:
-            orders = resp.json().get("orders", [])
-            if orders:
-                order_id = orders[0]["id"]
-                log_test("Refund - found existing order", True, f"Order ID: {order_id}")
-                
-                # Try to refund
-                resp = requests.post(
-                    f"{BASE_URL}/admin/orders/{order_id}/refund",
-                    json={"amount": 100},
-                    cookies={"ark_admin": cookie},
-                    timeout=10
-                )
-                passed = resp.status_code == 503 and "razorpay" in resp.text.lower() and "not configured" in resp.text.lower()
-                log_test("Refund - existing order returns 503 (Razorpay not configured)", passed,
-                        f"Status: {resp.status_code}, Body: {resp.text[:150]}")
+            log(f"  Attempt {i+1}/9: {resp.status_code}")
+            if i < 8:
+                assert resp.status_code == 401, f"Expected 401 for attempt {i+1}, got {resp.status_code}"
             else:
-                log_test("Refund - found existing order", False, "No orders found")
-        else:
-            log_test("Refund - found existing order", False, f"Could not get orders: {resp.status_code}")
-    except Exception as e:
-        log_test("Refund - existing order returns 503 (Razorpay not configured)", False, str(e))
-
-def test_quick_regression():
-    """Test 5: Quick regression tests"""
-    print("\n=== TEST 5: QUICK REGRESSION ===")
-    
-    # Test 5a: GET /api/health -> 200
-    try:
-        resp = requests.get(f"{BASE_URL}/health", timeout=10)
-        passed = resp.status_code == 200
-        if passed:
-            data = resp.json()
-            passed = data.get("ok") == True
-        log_test("Regression - GET /api/health returns 200", passed,
-                f"Status: {resp.status_code}")
-    except Exception as e:
-        log_test("Regression - GET /api/health returns 200", False, str(e))
-    
-    # Test 5b: GET /api/catalog -> 200
-    try:
-        resp = requests.get(f"{BASE_URL}/catalog", timeout=10)
-        passed = resp.status_code == 200
-        if passed:
-            data = resp.json()
-            products = data.get("products", [])
-            passed = isinstance(products, list)
-        log_test("Regression - GET /api/catalog returns 200", passed,
-                f"Status: {resp.status_code}, Products: {len(products) if passed else 0}")
-    except Exception as e:
-        log_test("Regression - GET /api/catalog returns 200", False, str(e))
-    
-    # Test 5c: GET /api/admin/products with auth -> 200
-    cookie = admin_login("50")
-    if cookie:
-        try:
-            resp = requests.get(
-                f"{BASE_URL}/admin/products",
-                cookies={"ark_admin": cookie},
-                timeout=10
+                assert resp.status_code == 429, f"Expected 429 for attempt {i+1}, got {resp.status_code}"
+        log("✅ D1 PASS: Admin login rate limited after 8 attempts")
+        
+        # D2: OTP send limits (5/contact, 5/order, 10/IP per 15 min)
+        log("D2: OTP send rate limits")
+        
+        # Test contact limit (5 per 15 min) - use different orders for each request
+        ip2 = "192.168.1.101"
+        for i in range(6):
+            order_id = create_test_order(db)
+            resp = requests.post(f"{INTERNAL_URL}/orders/access/request",
+                json={"orderNumber": order_id[:8], "contact": TEST_EMAIL},
+                headers={"X-Forwarded-For": ip2}
             )
-            passed = resp.status_code == 200
-            if passed:
-                data = resp.json()
-                products = data.get("products", [])
-                passed = isinstance(products, list)
-            log_test("Regression - GET /api/admin/products returns 200", passed,
-                    f"Status: {resp.status_code}, Products: {len(products) if passed else 0}")
-        except Exception as e:
-            log_test("Regression - GET /api/admin/products returns 200", False, str(e))
-    else:
-        log_test("Regression - GET /api/admin/products returns 200", False, "Could not login")
+            log(f"  Contact limit attempt {i+1}/6: {resp.status_code}")
+            if i < 5:
+                assert resp.status_code == 200, f"Expected 200 for attempt {i+1}, got {resp.status_code}"
+            else:
+                assert resp.status_code == 429, f"Expected 429 for attempt {i+1}, got {resp.status_code}"
+            cleanup_test_data(db, [order_id])
+        
+        log("✅ D2 PASS: OTP send rate limits working")
+        
+        # D3: OTP verify limits -> 429
+        log("D3: OTP verify rate limits")
+        order_id = create_test_order(db)
+        
+        # Request OTP first
+        resp = requests.post(f"{INTERNAL_URL}/orders/access/request",
+            json={"orderNumber": order_id[:8], "contact": TEST_EMAIL}
+        )
+        time.sleep(1)
+        
+        # Try to verify with wrong code many times
+        ip3 = "192.168.1.102"
+        for i in range(21):
+            resp = requests.post(f"{INTERNAL_URL}/orders/access/verify",
+                json={"orderNumber": order_id[:8], "code": "000000"},
+                headers={"X-Forwarded-For": ip3}
+            )
+            if i < 20:
+                assert resp.status_code in [400, 429], f"Expected 400 or 429 for attempt {i+1}, got {resp.status_code}"
+            else:
+                assert resp.status_code == 429, f"Expected 429 for attempt {i+1}, got {resp.status_code}"
+        
+        cleanup_test_data(db, [order_id])
+        log("✅ D3 PASS: OTP verify rate limits working")
+        
+        # D4: Restart persistence test
+        log("D4: Rate limit persistence after restart")
+        # Hit a limit
+        ip4 = "192.168.1.103"
+        for i in range(9):
+            resp = requests.post(f"{INTERNAL_URL}/admin/login",
+                json={"email": ADMIN_EMAIL, "password": "WrongPassword123"},
+                headers={"X-Forwarded-For": ip4}
+            )
+        
+        # Verify we're blocked
+        resp = requests.post(f"{INTERNAL_URL}/admin/login",
+            json={"email": ADMIN_EMAIL, "password": "WrongPassword123"},
+            headers={"X-Forwarded-For": ip4}
+        )
+        assert resp.status_code == 429, f"Expected 429 before restart, got {resp.status_code}"
+        
+        # Restart nextjs
+        log("  Restarting nextjs service...")
+        os.system("sudo supervisorctl restart nextjs")
+        time.sleep(15)  # Wait for restart
+        
+        # Try again - should still be blocked (counter persisted in DB)
+        resp = requests.post(f"{INTERNAL_URL}/admin/login",
+            json={"email": ADMIN_EMAIL, "password": "WrongPassword123"},
+            headers={"X-Forwarded-For": ip4}
+        )
+        assert resp.status_code == 429, f"Expected 429 after restart (persistence), got {resp.status_code}"
+        log("✅ D4 PASS: Rate limits persist after restart")
+        
+        log("✅ SCENARIO D: ALL PASS")
+        return True
+        
+    finally:
+        # Clean up rate_limits
+        cleanup_rate_limits(db, [
+            "^admin-login:ip:",
+            "^otp-send:ip:",
+            "^otp-send:contact:",
+            "^otp-send:order:",
+            "^otp-verify:ip:",
+            "^otp-verify:order:"
+        ])
+
+def scenario_e_trusted_proxy(db):
+    """E. Trusted proxy (TRUSTED_PROXY_HOPS=2)"""
+    log("\n=== SCENARIO E: Trusted Proxy ===")
+    
+    # Clean up rate limits first (including account-level)
+    cleanup_rate_limits(db, ["^admin-login:ip:", "^admin-login:acct:"])
+    
+    try:
+        # E1: Hit admin login with spoofed X-Forwarded-For -> still blocked after 8
+        log("E1: Trusted proxy ignores spoofed X-Forwarded-For")
+        
+        # Try with different spoofed IPs (should all be treated as same real IP)
+        for i in range(9):
+            spoofed_ip = f"9.9.9.{i}"
+            resp = requests.post(f"{EXTERNAL_URL}/admin/login",
+                json={"email": ADMIN_EMAIL, "password": "WrongPassword123"},
+                headers={"X-Forwarded-For": spoofed_ip}
+            )
+            log(f"  Attempt {i+1}/9 with spoofed IP {spoofed_ip}: {resp.status_code}")
+            if i < 8:
+                assert resp.status_code == 401, f"Expected 401 for attempt {i+1}, got {resp.status_code}"
+            else:
+                assert resp.status_code == 429, f"Expected 429 for attempt {i+1}, got {resp.status_code}"
+        
+        log("✅ E1 PASS: Spoofed X-Forwarded-For ignored, real client IP used for rate limiting")
+        
+        # E2: Check rate_limits _id keys use real egress IP, not spoofed
+        log("E2: Check rate_limits keys use real IP")
+        rate_limit_keys = list(db.rate_limits.find({"_id": {"$regex": "^admin-login:ip:"}}))
+        for key_doc in rate_limit_keys:
+            key = key_doc["_id"]
+            assert "9.9.9." not in key, f"Spoofed IP found in rate_limits key: {key}"
+            log(f"  ✓ Rate limit key uses real IP: {key}")
+        log("✅ E2 PASS: Rate limit keys use real egress IP, not spoofed values")
+        
+        log("✅ SCENARIO E: ALL PASS")
+        return True
+        
+    finally:
+        # Clean up rate_limits
+        cleanup_rate_limits(db, ["^admin-login:ip:"])
+
+def scenario_f_smoke(db):
+    """F. Smoke tests"""
+    log("\n=== SCENARIO F: Smoke Tests ===")
+    
+    # F1: GET /api/catalog -> 200
+    log("F1: GET /api/catalog")
+    resp = requests.get(f"{INTERNAL_URL}/catalog")
+    assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+    data = resp.json()
+    assert "products" in data or isinstance(data, list), "Invalid catalog response"
+    log("✅ F1 PASS: GET /api/catalog returns 200")
+    
+    # F2: GET /api/store-config -> paymentsEnabled false
+    log("F2: GET /api/store-config")
+    resp = requests.get(f"{INTERNAL_URL}/store-config")
+    assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+    data = resp.json()
+    assert data.get("paymentsEnabled") == False, f"Expected paymentsEnabled:false, got {data.get('paymentsEnabled')}"
+    log("✅ F2 PASS: GET /api/store-config returns paymentsEnabled:false")
+    
+    # F3: POST /api/orders -> 503 PAYMENTS_UNAVAILABLE
+    log("F3: POST /api/orders -> 503 PAYMENTS_UNAVAILABLE")
+    resp = requests.post(f"{INTERNAL_URL}/orders", json={
+        "items": [{"sku": "ARK-KV-001", "qty": 1}],
+        "customer": {
+            "fullName": "Test Customer",
+            "email": "test@example.com",
+            "mobile": "+919800000000",
+            "address1": "123 Test St",
+            "city": "Mumbai",
+            "state": "Maharashtra",
+            "pincode": "400001"
+        }
+    })
+    assert resp.status_code == 503, f"Expected 503, got {resp.status_code}"
+    data = resp.json()
+    assert data.get("code") == "PAYMENTS_UNAVAILABLE", f"Expected PAYMENTS_UNAVAILABLE, got {data.get('code')}"
+    log("✅ F3 PASS: POST /api/orders returns 503 PAYMENTS_UNAVAILABLE")
+    
+    log("✅ SCENARIO F: ALL PASS")
+    return True
 
 def main():
-    """Run all tests"""
-    print("=" * 80)
-    print("ARKADHATRI BACKEND TEST - Admin Security + Email + Refund")
-    print("=" * 80)
+    log("=== ARKADHATRI Security Regression Test ===")
+    log(f"Internal URL: {INTERNAL_URL}")
+    log(f"External URL: {EXTERNAL_URL}")
+    log(f"MongoDB: {MONGO_URL}/{DB_NAME}")
+    
+    # Connect to MongoDB
+    client = MongoClient(MONGO_URL)
+    db = client[DB_NAME]
+    log("✅ Connected to MongoDB")
+    
+    results = {}
     
     try:
-        # Run all test suites
-        test_password_change()
-        test_forgot_reset()
-        test_email_endpoints()
-        test_refund_endpoint()
-        test_quick_regression()
-        
-        # Summary
-        print("\n" + "=" * 80)
-        print("TEST SUMMARY")
-        print("=" * 80)
-        
-        total = len(test_results)
-        passed = sum(1 for t in test_results if t["passed"])
-        failed = total - passed
-        
-        print(f"\nTotal: {total} tests")
-        print(f"Passed: {passed} ✅")
-        print(f"Failed: {failed} ❌")
-        
-        if failed > 0:
-            print("\nFailed tests:")
-            for t in test_results:
-                if not t["passed"]:
-                    print(f"  ❌ {t['name']}")
-                    if t["details"]:
-                        print(f"     {t['details']}")
-        
-        print("\n" + "=" * 80)
-        
-        # Exit with appropriate code
-        sys.exit(0 if failed == 0 else 1)
+        # Run all scenarios
+        results["A"] = scenario_a_unauthorized_order_access(db)
+        results["B"] = scenario_b_otp(db)
+        results["C"] = scenario_c_admin_reset(db)
+        results["D"] = scenario_d_rate_limits(db)
+        results["E"] = scenario_e_trusted_proxy(db)
+        results["F"] = scenario_f_smoke(db)
         
     except Exception as e:
-        print(f"\n❌ FATAL ERROR: {e}")
+        log(f"❌ TEST FAILED: {e}")
         import traceback
         traceback.print_exc()
+        sys.exit(1)
+    
+    finally:
+        # Final cleanup
+        log("\n=== Final Cleanup ===")
+        db.mock_outbox.delete_many({"to": {"$in": [TEST_EMAIL, ADMIN_EMAIL]}})
+        db.order_otps.delete_many({})
+        cleanup_rate_limits(db, [
+            "^admin-login:ip:",
+            "^admin-forgot:ip:",
+            "^admin-reset:ip:",
+            "^otp-send:",
+            "^otp-verify:"
+        ])
+        log("✅ Final cleanup complete")
+    
+    # Summary
+    log("\n=== SUMMARY ===")
+    for scenario, passed in results.items():
+        status = "✅ PASS" if passed else "❌ FAIL"
+        log(f"Scenario {scenario}: {status}")
+    
+    all_passed = all(results.values())
+    if all_passed:
+        log("\n✅ ALL SCENARIOS PASSED")
+        sys.exit(0)
+    else:
+        log("\n❌ SOME SCENARIOS FAILED")
         sys.exit(1)
 
 if __name__ == "__main__":

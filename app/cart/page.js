@@ -8,7 +8,7 @@ import { cart, inr } from '@/lib/cart'
 import { useStoreConfig, shippingFor } from '@/lib/store-config'
 import CouponBox from '@/components/CouponBox'
 
-import { LOGO_URL } from '@/lib/brand'
+import BrandLogo from '@/components/BrandLogo'
 
 const CartPage = () => {
   const [items, setItems] = useState([])
@@ -55,7 +55,7 @@ const CartPage = () => {
             <ChevronLeft size={16} strokeWidth={1.4} className="group-hover:-translate-x-1 transition-transform" />
             <span className="font-cinzel text-[0.6rem] tracking-[0.35em]">CONTINUE SHOPPING</span>
           </Link>
-          <Link href="/"><img src={LOGO_URL} alt="ARKADHATRI" className="h-12 md:h-14 object-contain" /></Link>
+          <Link href="/"><BrandLogo size="md" /></Link>
           <span className="font-cinzel text-[0.6rem] tracking-[0.35em] text-burgundy-ink">MY BAG</span>
         </div>
       </header>
@@ -95,9 +95,9 @@ const CartPage = () => {
                       </div>
                       <div className="mt-4 flex items-center justify-between gap-3 flex-wrap">
                         <div className="flex items-center gap-3 border border-burgundy-ink/20 rounded-sm">
-                          <button onClick={() => cart.setQty(it.sku, it.qty - 1)} data-testid="cart-qty-decrease" className="w-9 h-9 flex items-center justify-center text-burgundy-ink hover:bg-burgundy-ink/5 transition-colors" aria-label="Decrease"><Minus size={14} strokeWidth={2} color="#2A0810" /></button>
+                          <button onClick={() => cart.setQty(it.sku, it.qty - 1)} data-testid="cart-qty-decrease" className="w-9 h-9 flex items-center justify-center text-burgundy-ink hover:bg-burgundy-ink/5 transition-colors" aria-label="Decrease"><Minus size={14} strokeWidth={2} color="#2A0D14" /></button>
                           <span data-testid="cart-qty" className="font-inter font-semibold text-base text-burgundy-ink w-8 text-center">{it.qty}</span>
-                          <button onClick={() => cart.setQty(it.sku, it.qty + 1)} data-testid="cart-qty-increase" className="w-9 h-9 flex items-center justify-center text-burgundy-ink hover:bg-burgundy-ink/5 transition-colors" aria-label="Increase"><Plus size={14} strokeWidth={2} color="#2A0810" /></button>
+                          <button onClick={() => cart.setQty(it.sku, it.qty + 1)} data-testid="cart-qty-increase" className="w-9 h-9 flex items-center justify-center text-burgundy-ink hover:bg-burgundy-ink/5 transition-colors" aria-label="Increase"><Plus size={14} strokeWidth={2} color="#2A0D14" /></button>
                         </div>
                         <div className="font-cinzel text-lg md:text-xl text-burgundy-ink" style={{ fontWeight: 600 }}>{it.currency} {inr(it.price * it.qty)}</div>
                       </div>

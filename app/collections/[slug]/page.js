@@ -10,8 +10,10 @@ import { cart } from '@/lib/cart'
 import ProductCard from '@/components/ProductCard'
 import { useCatalog } from '@/lib/catalog'
 import TrustStrip from '@/components/TrustStrip'
+import SiteHeader from '@/components/SiteHeader'
+import SiteFooter from '@/components/SiteFooter'
 
-import { LOGO_URL } from '@/lib/brand'
+import BrandLogo from '@/components/BrandLogo'
 
 const Header = () => {
   const [count, setCount] = useState(0)
@@ -28,7 +30,7 @@ const Header = () => {
           <ChevronLeft size={16} strokeWidth={1.4} className="group-hover:-translate-x-1 transition-transform" />
           <span className="font-cinzel text-[0.6rem] tracking-[0.35em]">BACK TO SHOP</span>
         </Link>
-        <Link href="/"><img src={LOGO_URL} alt="ARKADHATRI" className="h-12 md:h-14 object-contain" /></Link>
+        <Link href="/"><BrandLogo size="md" /></Link>
         <Link href="/cart" className="relative text-burgundy-ink hover:text-gold transition-colors" aria-label="Cart">
           <ShoppingBag size={18} strokeWidth={1.4} />
           <span className="absolute -top-1.5 -right-2 min-w-[16px] h-[16px] px-1 flex items-center justify-center rounded-full bg-gold text-burgundy-ink text-[9px] font-cinzel font-semibold">{count}</span>
@@ -92,7 +94,7 @@ const CollectionPage = () => {
   const { products, loading } = useCatalog()
   const base = useMemo(() => getProductsByCollection(slug, products), [slug, products])
 
-  useEffect(() => { if (collection) document.title = `${collection.name} \u2014 ARKADHATRI` }, [collection])
+
 
   // Filter & sort state
   const [fabrics,   setFabrics]   = useState([])
@@ -139,17 +141,8 @@ const CollectionPage = () => {
   )
 
   return (
-    <main className="min-h-screen bg-luxury-ivory">
-      {/* Breadcrumb schema */}
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
-        '@context': 'https://schema.org', '@type': 'BreadcrumbList',
-        itemListElement: [
-          { '@type': 'ListItem', position: 1, name: 'Home', item: '/' },
-          { '@type': 'ListItem', position: 2, name: 'Collections', item: '/#collections' },
-          { '@type': 'ListItem', position: 3, name: collection.name }
-        ]
-      })}} />
-      <Header />
+    <main id="main" className="min-h-screen bg-luxury-ivory">
+      <SiteHeader />
 
       {/* Collection hero */}
       <section className="relative bg-burgundy-ink overflow-hidden">
@@ -276,6 +269,7 @@ const CollectionPage = () => {
 
       {/* Trust strip */}
       <TrustStrip variant="ivory" />
+      <SiteFooter />
 
       {/* Other collections */}
       <section className="py-16 md:py-20">

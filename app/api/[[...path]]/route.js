@@ -5,8 +5,9 @@ import { NextResponse } from 'next/server'
 import { handleAdmin } from '@/lib/admin-api'
 import { ORDER_STATES, PAYMENT_STATES } from '@/lib/orders'
 import { applyCors } from '@/lib/cors'
-import { rateLimit, ipFromRequest } from '@/lib/rate-limit'
-import { sendOrderConfirmation, sendPaymentFailed, sendRefundProcessed } from '@/lib/mailer'
+import { rateLimit, ipFromRequest, limitAll } from '@/lib/rate-limit'
+import { sendOrderConfirmation, sendPaymentFailed, sendRefundProcessed, sendOrderAccessCode, mailConfigured } from '@/lib/mailer'
+import { orderAccessReady, genCode, hashCode, safeEq, normaliseOrderRef, findOrdersByRef, contactKind, contactMatches, canAccessOrder, orderCookie, publicOrder, OTP_TTL_MS, OTP_MAX_ATTEMPTS, OTP_RESEND_MS } from '@/lib/order-access'
 import { serveMedia } from '@/lib/media'
 import { paymentsEnabled, releaseOrderReservation, expireStaleReservations, getStoreSettings, shippingFor } from '@/lib/inventory'
 
@@ -49,7 +50,8 @@ async function connectToMongo() {
       db.collection('products').createIndex({ sku: 1 }, { unique: true }).catch(()=>{}),
       db.collection('coupons').createIndex({ code: 1 }, { unique: true }).catch(()=>{}),
       db.collection('webhook_events').createIndex({ eventId: 1 }, { unique: true }).catch(()=>{}),
-      db.collection('newsletter').createIndex({ email: 1 }, { unique: true }).catch(()=>{})
+      db.collection('newsletter').createIndex({ email: 1 }, { unique: true }).catch(()=>{}),
+      db.collection('order_otps').createIndex({ purgeAt: 1 }, { expireAfterSeconds: 0 }).catch(()=>{})
     ])
   }
   return db
@@ -288,16 +290,19 @@ async function handleRoute(request, { params }) {
     // ================= ORDERS =================
     // POST /api/orders  -> create order in PAYMENT_PENDING + reserve stock + (optionally) init Razorpay order
     if (route === '/orders' && method === 'POST') {
-      const rl = rateLimit(`orders:${ipFromRequest(request)}`, { max: 10, windowMs: 60_000 })
-      if (!rl.allowed) return respond({ error: 'Too many requests. Please try again shortly.' }, 429, request)
+      const ip = ipFromRequest(request)
+      const rl = await limitAll([[`orders:ip:${ip}`, { max: 10, windowMs: 60_000, blockMs: 5 * 60_000 }]])
+      if (!rl.allowed) return respond({ error: 'Too many requests. Please try again in a few minutes.' }, 429, request)
       // Online payment not configured yet: refuse BEFORE validating or reserving any stock.
       if (!paymentsEnabled()) {
         return respond({ error: 'Online payments are opening soon. Please message us on WhatsApp to reserve this saree.', code: 'PAYMENTS_UNAVAILABLE' }, 503, request)
       }
       expireStaleReservations(db).catch((e) => console.error('expiry sweep', e))
 
-      const body = await request.json()
+      const body = await request.json().catch(() => ({}))
       const cust = body?.customer || {}
+      const rlc = await limitAll([[cust.email ? `orders:contact:${String(cust.email).trim().toLowerCase()}` : null, { max: 6, windowMs: 10 * 60_000, blockMs: 15 * 60_000 }]])
+      if (!rlc.allowed) return respond({ error: 'Too many requests. Please try again in a few minutes.' }, 429, request)
       const requiredCust = ['fullName','email','mobile','address1','city','state','pincode']
       for (const k of requiredCust) {
         if (!cust[k]) return respond({ error: `Customer field required: ${k}` }, 400, request)
@@ -372,56 +377,130 @@ async function handleRoute(request, { params }) {
 
       await db.collection('orders').insertOne(order)
 
-      const { _id, ...safe } = order
-      return respond({
+      const created = respond({
         ok: true,
-        order: safe,
+        order: publicOrder(order),
         payment: razorpay.mocked
           ? { mocked: true }
           : { mocked: false, keyId: razorpay.keyId, razorpayOrderId: razorpay.order.id, amount: razorpay.order.amount }
       }, 200, request)
+      // The person who just placed the order gets a short-lived session for that order only.
+      if (orderAccessReady()) created.headers.append('Set-Cookie', orderCookie(request, order.id))
+      return created
     }
 
-    // GET /api/orders/:id
+    // ================= PRODUCT FEED (Meta Commerce / Google Merchant, published products only) =================
+    // GET /api/feed/products.csv — real catalogue data only; no GTIN/MPN invented (identifier_exists = no).
+    if (route === '/feed/products.csv' && method === 'GET') {
+      const origin = String(process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_BASE_URL || '').replace(/\/$/, '')
+      const list = await db.collection('products').find({ status: { $in: ['published', 'out-of-stock'] } }, { projection: { _id: 0 } }).toArray()
+      const q = (v) => `"${String(v ?? '').replace(/\s+/g, ' ').replace(/"/g, '""').trim()}"`
+      const head = ['id', 'title', 'description', 'availability', 'condition', 'price', 'link', 'image_link', 'additional_image_link', 'brand', 'identifier_exists', 'product_type', 'color', 'material']
+      const rows = list.map((p) => {
+        const avail = p.status === 'out-of-stock' || Number(p.stock) <= 0 ? 'out of stock' : 'in stock'
+        return [p.sku, `${p.name} - ${p.tagline || 'Saree'}`, p.description || p.tagline, avail, 'new', `${Number(p.price || 0).toFixed(2)} INR`,
+          `${origin}/product/${p.slug}`, (p.images || [])[0], (p.images || []).slice(1, 6).join(','), 'ARKADHATRI', 'no',
+          `Apparel & Accessories > Clothing > Traditional & Ceremonial Clothing > Saris & Lehengas > ${p.collectionName || 'Sarees'}`, p.colourName, p.fabricType].map(q).join(',')
+      })
+      return new Response([head.join(','), ...rows].join('\n'), { status: 200, headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Cache-Control': 'public, max-age=900', 'X-Robots-Tag': 'noindex' } })
+    }
+
+    // ================= PRIVATE ORDER ACCESS =================
+    // Step 1: POST /api/orders/access/request { orderNumber, contact } -> 6-digit code to the email on that order.
+    if (route === '/orders/access/request' && method === 'POST') {
+      const body = await request.json().catch(() => ({}))
+      const contact = String(body?.contact || '').trim().slice(0, 200)
+      const kind = contactKind(contact)
+      const ref = normaliseOrderRef(body?.orderNumber)
+      if (!ref || !kind) return respond({ error: 'Please enter your order number and the email address used for the order.' }, 400, request)
+      const ip = ipFromRequest(request)
+      const rl = await limitAll([
+        [`otp-send:ip:${ip}`, { max: 10, windowMs: 15 * 60_000 }],
+        [`otp-send:contact:${contact.toLowerCase()}`, { max: 5, windowMs: 15 * 60_000 }],
+        [`otp-send:order:${ref.full || ref.prefix}`, { max: 5, windowMs: 15 * 60_000 }]
+      ])
+      if (!rl.allowed) return respond({ error: 'Too many requests. Please wait a few minutes and try again.' }, 429, request)
+      // SMS needs a text-message provider, which is not set up yet.
+      if (kind === 'phone') return respond({ error: 'Text-message codes are not available yet. Please use the email address on your order.', code: 'SMS_UNAVAILABLE' }, 503, request)
+      // Fail closed (before any lookup) when email delivery or the server key is missing.
+      if (!mailConfigured() || !orderAccessReady()) return respond({ error: 'Order verification is temporarily unavailable. Please contact us on WhatsApp for help with your order.', code: 'DELIVERY_UNAVAILABLE' }, 503, request)
+      const generic = respond({ ok: true, message: 'If those details match an order, we have emailed a 6-digit code to the address on that order. It expires in 5 minutes.', resendIn: Math.round(OTP_RESEND_MS / 1000) }, 200, request)
+      const order = (await findOrdersByRef(db, ref)).find((o) => contactMatches(o, kind, contact))
+      if (!order) return generic
+      const now = Date.now()
+      const prev = await db.collection('order_otps').findOne({ _id: order.id })
+      if (prev?.lastSentAt && now - new Date(prev.lastSentAt).getTime() < OTP_RESEND_MS) return generic // cooldown
+      const code = genCode()
+      // Replaces any earlier code for this order (old codes stop working).
+      await db.collection('order_otps').updateOne(
+        { _id: order.id },
+        { $set: { codeHash: hashCode(order.id, code), expiresAt: new Date(now + OTP_TTL_MS), attempts: 0, lastSentAt: new Date(now), channel: 'email', purgeAt: new Date(now + 60 * 60_000) } },
+        { upsert: true }
+      )
+      const sent = await sendOrderAccessCode(order.customer.email, order.id, code)
+      if (!sent?.ok) {
+        await db.collection('order_otps').deleteOne({ _id: order.id })
+        return respond({ error: 'Order verification is temporarily unavailable. Please contact us on WhatsApp for help with your order.', code: 'DELIVERY_UNAVAILABLE' }, 503, request)
+      }
+      return generic
+    }
+
+    // Step 2: POST /api/orders/access/verify { orderNumber, code } -> short-lived session for that one order.
+    if (route === '/orders/access/verify' && method === 'POST') {
+      const body = await request.json().catch(() => ({}))
+      const ref = normaliseOrderRef(body?.orderNumber)
+      const code = String(body?.code || '').trim()
+      const bad = () => respond({ error: 'That code is not valid or has expired. Please request a new code.' }, 400, request)
+      if (!ref || !/^\d{6}$/.test(code)) return bad()
+      if (!orderAccessReady()) return respond({ error: 'Order verification is temporarily unavailable.', code: 'DELIVERY_UNAVAILABLE' }, 503, request)
+      const ip = ipFromRequest(request)
+      const rl = await limitAll([
+        [`otp-verify:ip:${ip}`, { max: 20, windowMs: 15 * 60_000 }],
+        [`otp-verify:order:${ref.full || ref.prefix}`, { max: 10, windowMs: 15 * 60_000 }]
+      ])
+      if (!rl.allowed) return respond({ error: 'Too many attempts. Please wait a few minutes and try again.' }, 429, request)
+      const ids = (await findOrdersByRef(db, ref)).map((o) => o.id)
+      if (!ids.length) return bad()
+      // Atomically use up one of the 5 attempts on a live code.
+      const r = await db.collection('order_otps').findOneAndUpdate(
+        { _id: { $in: ids }, expiresAt: { $gt: new Date() }, attempts: { $lt: OTP_MAX_ATTEMPTS } },
+        { $inc: { attempts: 1 } },
+        { returnDocument: 'after' }
+      )
+      const otp = r?.value !== undefined ? r.value : r
+      if (!otp || !safeEq(hashCode(otp._id, code), otp.codeHash)) return bad()
+      // Single use: delete only if it is still the same code (guards against a parallel resend/reuse).
+      const del = await db.collection('order_otps').deleteOne({ _id: otp._id, codeHash: otp.codeHash })
+      if (!del.deletedCount) return bad()
+      const res = respond({ ok: true, orderId: otp._id }, 200, request)
+      res.headers.append('Set-Cookie', orderCookie(request, otp._id))
+      return res
+    }
+
+    if (route === '/orders/access/logout' && method === 'POST') {
+      const res = respond({ ok: true }, 200, request)
+      res.headers.append('Set-Cookie', orderCookie(request, null))
+      return res
+    }
+
+    // GET /api/orders/:id  -> only with a session for that order; customer-safe fields only
     if (route.match(/^\/orders\/[^/]+$/) && method === 'GET') {
       const id = route.split('/')[2]
+      if (!canAccessOrder(request, id)) return respond({ error: 'Please verify your order to view it.', code: 'VERIFY_REQUIRED' }, 401, request)
       const order = await db.collection('orders').findOne({ id })
       if (!order) return respond({ error: 'Order not found' }, 404, request)
-      const { _id, ...safe } = order
-      return respond({ order: safe }, 200, request)
+      return respond({ order: publicOrder(order) }, 200, request)
     }
 
-    // POST /api/orders/track  { orderId, identifier }  where identifier = email or mobile
+    // POST /api/orders/track { orderId } -> same as above (kept for older links); requires an order session
     if (route === '/orders/track' && method === 'POST') {
-      const rl = rateLimit(`track:${ipFromRequest(request)}`, { max: 12, windowMs: 60_000 })
-      if (!rl.allowed) return respond({ error: 'Too many attempts. Please try again shortly.' }, 429, request)
-      const body = await request.json()
-      const orderId = String(body?.orderId || '').trim()
-      const idn = String(body?.identifier || '').trim().toLowerCase()
-      if (!orderId || !idn) return respond({ error: 'Order ID and email or mobile are required' }, 400, request)
-      const order = await db.collection('orders').findOne({ id: orderId })
-      const emailMatch = order?.customer?.email?.toLowerCase() === idn
-      const mobileMatch = order?.customer?.mobile && String(order.customer.mobile).replace(/\D/g,'').endsWith(idn.replace(/\D/g,'').slice(-10))
-      if (!order || (!emailMatch && !mobileMatch)) {
-        return respond({ error: 'We could not find that order with the details provided.' }, 404, request)
-      }
-      // Redacted view for public tracking
-      return respond({
-        order: {
-          id: order.id,
-          status: order.status,
-          paymentStatus: order.paymentStatus,
-          items: order.items?.map(i => ({ name: i.name, qty: i.qty, image: i.image })),
-          total: order.total,
-          courier: order.courier || null,
-          awb: order.awb || null,
-          trackingUrl: order.trackingUrl || null,
-          shipmentStatus: order.shipmentStatus || null,
-          placedAt: order.createdAt,
-          shippedAt: order.shippedAt || null,
-          deliveredAt: order.deliveredAt || null
-        }
-      }, 200, request)
+      const body = await request.json().catch(() => ({}))
+      const ref = normaliseOrderRef(body?.orderId)
+      const ids = ref ? (await findOrdersByRef(db, ref)).map((o) => o.id) : []
+      const id = ids.find((x) => canAccessOrder(request, x))
+      if (!id) return respond({ error: 'Please verify your order to view it.', code: 'VERIFY_REQUIRED' }, 401, request)
+      const order = await db.collection('orders').findOne({ id })
+      return respond({ order: publicOrder(order) }, 200, request)
     }
 
     // ================= COUPONS (public) =================
@@ -449,6 +528,7 @@ async function handleRoute(request, { params }) {
       const body = await request.json()
       const orderId = body?.orderId
       if (!orderId) return respond({ error: 'orderId required' }, 400, request)
+      if (!canAccessOrder(request, orderId)) return respond({ error: 'Please verify your order first.', code: 'VERIFY_REQUIRED' }, 401, request)
       const order = await db.collection('orders').findOne({ id: orderId })
       if (!order) return respond({ error: 'Order not found' }, 404, request)
       if (order.paymentStatus === PAYMENT_STATES.PAID) return respond({ error: 'Already paid' }, 409, request)
@@ -469,17 +549,17 @@ async function handleRoute(request, { params }) {
 
     // POST /api/payments/razorpay/verify  — called from client after Razorpay Checkout success
     if (route === '/payments/razorpay/verify' && method === 'POST') {
-      const body = await request.json()
+      const body = await request.json().catch(() => ({}))
       const { orderId, razorpay_order_id, razorpay_payment_id, razorpay_signature } = body || {}
       if (!orderId) return respond({ error: 'orderId required' }, 400, request)
+      if (!canAccessOrder(request, orderId)) return respond({ error: 'Please verify your order first.', code: 'VERIFY_REQUIRED' }, 401, request)
 
       const existing = await db.collection('orders').findOne({ id: orderId })
       if (!existing) return respond({ error: 'Order not found' }, 404, request)
 
       // Idempotency: if already paid, just return ok
       if (existing.paymentStatus === PAYMENT_STATES.PAID) {
-        const { _id, ...safe } = existing
-        return respond({ ok: true, already: true, order: safe }, 200, request)
+        return respond({ ok: true, already: true, order: publicOrder(existing) }, 200, request)
       }
 
       const keySecret = process.env.RAZORPAY_KEY_SECRET
@@ -536,8 +616,7 @@ async function handleRoute(request, { params }) {
       if (captured && confirmedNow && orderDoc?.paymentStatus === PAYMENT_STATES.PAID) {
         sendOrderConfirmation(orderDoc).catch(err => console.error('mail err', err))
       }
-      const { _id, ...safe } = orderDoc || {}
-      return respond({ ok: true, captured, order: safe }, 200, request)
+      return respond({ ok: true, captured, order: publicOrder(orderDoc) }, 200, request)
     }
 
     // POST /api/payments/razorpay/cancel — customer closed modal; DO NOT release stock immediately.
@@ -546,6 +625,7 @@ async function handleRoute(request, { params }) {
       const body = await request.json()
       const orderId = body?.orderId
       if (!orderId) return respond({ error: 'orderId required' }, 400, request)
+      if (!canAccessOrder(request, orderId)) return respond({ error: 'Please verify your order first.', code: 'VERIFY_REQUIRED' }, 401, request)
       const existing = await db.collection('orders').findOne({ id: orderId })
       if (!existing) return respond({ error: 'Order not found' }, 404, request)
       if (existing.paymentStatus === PAYMENT_STATES.PAID) return respond({ ok: true, already: true }, 200, request)
